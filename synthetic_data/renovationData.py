@@ -40,16 +40,24 @@ responses = generate_subtopics(client, topic=topic, n_subtopics=n_subtopics)
 print(responses.choices[0].message.content)
 
 QUESTION_PROMPT_TEMPLATE = """\
-Given a renovation project type, generate {n_questions} renovation scenarios with details.
+Given a renovation project type, generate {n_questions} renovation scenarios with detailed information.
 
-Each scenario must include fields:
-property_size (sqft), num_of_bedroom, num_of_bathroom, Location (must be a real area within Greater Manchester such as Manchester City Centre, Salford, Stockport, Bolton, Bury, Oldham, Rochdale, Tameside, Trafford, Wigan, Altrincham, Ashton-under-Lyne, Prestwich, Didsbury, Chorlton, Withington, Levenshulme, Sale, Stretford or Cheadle), 
-sqft_renovated, sqft_to_add_to_property, structural_changes?, type_of_project, renovation_type,  sqft_renovated, 
-sqft_to_add_to_property, structural_changes?, type_of_project, renovation_type, 
-material_grade, Labour rate / hr, renovation_cost
+Each scenario must include the following fields:
+- property_size (sqft)
+- num_of_bedroom
+- num_of_bathroom
+- Location (must be a real area within Greater Manchester, e.g., Manchester City Centre, Salford, Stockport, Bolton, Bury, Oldham, Rochdale, Tameside, Trafford, Wigan, Altrincham, Ashton-under-Lyne, Prestwich, Didsbury, Chorlton, Withington, Levenshulme, Sale, Stretford, or Cheadle)
+- sqft_renovated
+- sqft_to_add_to_property
+- structural_changes? (Yes/No)
+- type_of_project
+- renovation_type (must be one of: Full renovation, Kitchen, Bathroom, Bedroom, Living room, Other)
+- material_grade (must be one of: High-end, Mid-range, Budget-Friendly)
+- labour_rate_per_hr
+- renovation_cost
 
-Provide each scenario as a JSON object per line.
-The list must be without numbers, separated by newlines, with no extra text.
+Provide each scenario as a JSON object on a new line.  
+The output must not include numbering, bullet points, or extra commentary—just valid JSON objects separated by newlines.
 """
 
 subtopic_list = responses.choices[0].message.content.split(",")
