@@ -3,6 +3,7 @@ import os
 from openai import OpenAI  
 from datasets import Dataset, DatasetDict, load_dataset
 import json
+import math
 
 topic = "Property Renovation Data"
 n_subtopics = 10
@@ -88,15 +89,25 @@ def generate_scenarios(client, sub_topic, n_questions):
 
 # Collect all scenarios
 BATCH_SIZE = 20
-BATCHES = n_questions // BATCH_SIZE
+#BATCHES = n_questions // BATCH_SIZE
+BATCHES = math.ceil(n_questions / BATCH_SIZE)
 
 all_scenarios = []
 
+# for subtopic in subtopic_list:
+#     print(f"\nGenerating scenarios for subtopic: {subtopic.strip()}")
+#     scenarios = generate_scenarios(client, subtopic.strip(), n_questions)
+#     all_scenarios.extend(scenarios)
+#     print(f"  Added {len(scenarios)} scenarios (total so far: {len(all_scenarios)})")
+
 for subtopic in subtopic_list:
     print(f"\nGenerating scenarios for subtopic: {subtopic.strip()}")
-    scenarios = generate_scenarios(client, subtopic.strip(), n_questions)
-    all_scenarios.extend(scenarios)
-    print(f"  Added {len(scenarios)} scenarios (total so far: {len(all_scenarios)})")
+    for batch in range(BATCHES):
+        print(f"  Batch {batch + 1}/{BATCHES}")
+        scenarios = generate_scenarios(client, subtopic.strip(), BATCH_SIZE)
+        all_scenarios.extend(scenarios)
+        print(f"  Added {len(scenarios)} scenarios (total so far: {len(all_scenarios)})")
+
 
 
 # 3️⃣ Optional: Add a fixed sample manually (as per your example)
