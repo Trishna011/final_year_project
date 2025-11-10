@@ -25,17 +25,14 @@ df = dataset.to_pandas()
 df = df.drop_duplicates()
 print("After removing duplicates:", df.shape)
 cat_cols = df.select_dtypes(include=['object', 'string', 'category']).columns
+
+#remove redundant columns
+df = df.drop(columns=["num_of_bedroom", "num_of_bathroom", "type_of_project"], errors="ignore")
+
 # Select only categorical or object/string columns
 cat_cols = df.select_dtypes(include=['object', 'string', 'category']).columns
 print("Categorical columns:", list(cat_cols))
-for col in cat_cols:
-    df[col] = (
-        df[col]
-        .astype(str)
-        .str.strip()            # remove leading/trailing spaces
-        .str.lower()            # make all lowercase
-        .str.replace('-', ' ')  # unify hyphens and spaces
-    )
+
 for col in cat_cols:
     df[col] = (
         df[col]
@@ -84,6 +81,7 @@ skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 rmse_scorer = make_scorer(mean_squared_error, greater_is_better=False, squared=False)
 r2_scores = []
 mape_scores = []
+all_shap_summaries = []
 for fold, (train_idx, test_idx) in enumerate(skf.split(X, df["cost_bin"])):
     X_train, X_test = X.iloc[train_idx].copy(), X.iloc[test_idx].copy()
     y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
@@ -114,15 +112,11 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X, df["cost_bin"])):
     #for test data, unseen locations get frequency 0
     X_test["Location"] = X_test["Location"].map(location_freq).fillna(0)
     
-    #one hot encode types_of_project 
-    X_train = pd.get_dummies(X_train, columns=["type_of_project"], prefix="project", drop_first=False)
-    X_test = pd.get_dummies(X_test, columns=["type_of_project"], prefix="project", drop_first=False)
     
-    #binary encode renovation_type
-    binary_encoder = ce.BinaryEncoder(cols=['renovation_type'])
-    X_train = binary_encoder.fit_transform(X_train)
-    X_test = binary_encoder.transform(X_test)
-    X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
+    #target encode renovation_type
+    target_encoder = ce.TargetEncoder(cols=['renovation_type'])
+    X_train = target_encoder.fit_transform(X_train, y_train)
+    X_test = target_encoder.transform(X_test)
     
     #ordinally encode material grade
     grade_order = {
@@ -139,34 +133,24 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X, df["cost_bin"])):
 #     print(X_train.head())
     
     #Add interaction terms
-    X_train["num_of_bedroom_x_labour_rate"] = X_train["num_of_bedroom"] * X_train["Labour rate / hr"]
-    X_test["num_of_bedroom_x_labour_rate"] = X_test["num_of_bedroom"] * X_test["Labour rate / hr"]
-    
-    
-    #LASSO feature selection
-    lasso = LassoCV(cv = 5, random_state = 42)
-    lasso.fit(X_train, y_train)
-    
-    #select only features with non 0 coefficients 
-    selected_features = X_train.columns[lasso.coef_ != 0]
-    print(f"Selected {len(selected_features)} features via LASSO")
-    
-    #reduce feature sets
-    X_train_selected_features = X_train[selected_features]
-    X_test_selected_features = X_test[selected_features]
+    X_train["material_grade_x_labour_rate"] = X_train["material_grade"] * X_train["labour_rate_per_hr"]
+    X_test["material_grade_x_labour_rate"] = X_test["material_grade"] * X_test["labour_rate_per_hr"]
 
+    X_train["location_x_labour_rate"] = X_train["Location"] * X_train["material_grade"]
+    X_test["location_x_labour_rate"] = X_test["Location"] * X_test["material_grade"]
     
-    #Training the XGBoost model with my selected features + RandomSearchCV
+    X_train = X_train.fillna(0)
+    X_test = X_test.fillna(0)
+
+    # === XGBoost model (no LASSO) ===
     xgb_model = XGBRegressor(
         objective="reg:squarederror",
         tree_method="hist",
-        random_state = 42,
+        random_state=42,
         device="cpu",
-        #data parallelism 
-        n_jobs = 1
+        n_jobs=-1
     )
-    
-    # --- Hyperparameter space for random search ---
+
     param_dist = {
         "n_estimators": [200, 400, 600],
         "learning_rate": [0.01, 0.05, 0.1],
@@ -178,25 +162,24 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X, df["cost_bin"])):
         "reg_alpha": [0, 0.1, 0.5],
         "reg_lambda": [1, 1.5, 2.0]
     }
-    
+
     random_search = RandomizedSearchCV(
         estimator=xgb_model,
         param_distributions=param_dist,
         n_iter=15,
         scoring=rmse_scorer,
-        cv=3,                 # inner CV inside each outer fold
+        cv=3,
         verbose=1,
         n_jobs=-1,
         random_state=42
     )
-    
-    # --- Run tuning ---
-    random_search.fit(X_train_selected_features, y_train_log)
+
+    random_search.fit(X_train, y_train_log)
     best_model = random_search.best_estimator_
     print("Best params:", random_search.best_params_)
-    
-    # --- Evaluate on test fold ---
-    y_pred = best_model.predict(X_test_selected_features)
+
+    # === Evaluation ===
+    y_pred = best_model.predict(X_test)
     rmse = root_mean_squared_error(y_test_log, y_pred)
     mae = mean_absolute_error(y_test_log, y_pred)
     mse = mean_squared_error(y_test_log, y_pred)
@@ -204,66 +187,89 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X, df["cost_bin"])):
     r2_scores.append(r2)
     mape = np.mean(np.abs((y_test_log - y_pred) / y_test_log)) * 100
     mape_scores.append(mape)
-    
-    print("Average RMSE across folds:", np.mean(rmse))
-    print(f"Fold {fold+1} Metrics:")
+
+    print(f"\nFold {fold+1} Metrics:")
     print(f"  MAE : {mae:.4f}")
-    print(f"  MSE : {mse:.4f}")
     print(f"  RMSE: {rmse:.4f}")
     print(f"  R²  : {r2:.4f}")
     print(f"  MAPE: {mape:.2f}%")
-    
-    
-    #shap interpretation
+
+    # === SHAP Analysis ===
     print("\n🔍 Calculating SHAP values...")
+    X_sample = X_test.sample(min(300, len(X_test)), random_state=42)
 
-    # Take a sample of test data for speed and visualization
-    X_sample = X_test_selected_features.sample(min(300, len(X_test_selected_features)), random_state=42)
+    print("SHAP: checking dtypes in X_sample...")
+    print(X_sample.dtypes.value_counts())
+    non_numeric = X_sample.select_dtypes(exclude=[np.number]).columns
+    if len(non_numeric) > 0:
+        print("Non-numeric columns found:", list(non_numeric))
 
-    # Use model.predict as a callable — this avoids the internal JSON problem
+
     explainer = shap.Explainer(best_model.predict, X_sample)
     shap_values = explainer(X_sample)
-    
     shap_importance = np.abs(shap_values.values).mean(axis=0)
 
-    # Create a DataFrame of feature → impact magnitude
-    shap_summary = pd.DataFrame({
-        "feature": X_sample.columns,
-        "mean_abs_shap": shap_importance
-    }).sort_values("mean_abs_shap", ascending=False).reset_index(drop=True)
+    shap_summary = (
+        pd.DataFrame({
+            "feature": X_sample.columns,
+            "mean_abs_shap": shap_importance
+        })
+        .sort_values("mean_abs_shap", ascending=False)
+        .reset_index(drop=True)
+    )
+    all_shap_summaries.append(shap_summary)
 
-    # --- Display top features affecting the model ---
-    print("\n📊 Top features impacting the model (Fold", fold + 1, ")")
-    for i, row in shap_summary.head(15).iterrows():
-        print(f"{i+1:2d}. {row['feature']:<40s} | Mean |SHAP| impact: {row['mean_abs_shap']:.5f}")
+    print("\n📊 Top SHAP features (Fold", fold + 1, ")")
+    for i, row in shap_summary.head(10).iterrows():
+        print(f"{i+1:2d}. {row['feature']:<35s} | Mean |SHAP|: {row['mean_abs_shap']:.5f}")
 
-
-    # --- Visualize ---
-    plt.title(f"SHAP Summary Plot — Fold {fold+1}")
     shap.summary_plot(shap_values.values, X_sample, show=False)
+    plt.title(f"SHAP Summary Plot — Fold {fold+1}")
     plt.show()
-    
-    corr = df.corr(numeric_only=True)
-    fig, ax = plt.subplots(figsize=(10, 8))
-    heatmap(corr.values, row_names=corr.columns, column_names=corr.columns)
-    plt.title("Feature Correlation Heatmap")
-    plt.show()
-    
+
+# === Aggregate Results ===
 overall_r2 = np.mean(r2_scores)
 overall_mape = np.mean(mape_scores)
+print(f"\nOverall R²: {overall_r2:.4f}")
+print(f"Overall MAPE: {overall_mape:.2f}%")
 
-print(f"  Overall R²  : {overall_r2:.4f}")
-print(f"  Overall MAPE  : {overall_mape:.4f}")
-    
+print("\n====================")
+print("📊 AVERAGE SHAP VALUES ACROSS ALL FOLDS")
+print("====================")
+
+
+shap_df = pd.concat(all_shap_summaries)
+shap_mean = (
+    shap_df.groupby("feature", as_index=False)["mean_abs_shap"]
+    .mean()
+    .sort_values("mean_abs_shap", ascending=False)
+    .reset_index(drop=True)
+)
+
+# Optional pruning example (commented)
+# keep_features = list(shap_mean["feature"].head(40))
+# domain_keep = ["material_grade", "sqft_renovated", "labour_rate_per_hr", "structural_changes"]
+# selected_features = list(set(keep_features + domain_keep))
+
+# Print all features sorted by importance
+for i, row in shap_mean.iterrows():
+    print(f"{i+1:2d}. {row['feature']:<40s} | Mean |SHAP|: {row['mean_abs_shap']:.6f}")
+
+# Save SHAP
+shap_mean.to_csv("overall_shap_values.csv", index=False)
+print("\n✅ Saved to 'overall_shap_values.csv'")
+
+# Save assets for inference
 joblib.dump({
     "model": best_model,
     "scaler": scaler,
     "label_encoder": label_encoder,
-    "binary_encoder": binary_encoder,
+    "target_encoder": target_encoder,
     "location_freq": location_freq,
     "grade_order": grade_order,
-    "selected_features": selected_features
+    "selected_features": X_train.columns  # all features kept
 }, "renovation_model_assets.pkl")
+print("\n💾 Model and preprocessing assets saved.")
 
 # BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ASSET_PATH = os.path.join(BASE_DIR, "renovation_model_assets.pkl")
@@ -297,7 +303,7 @@ def preprocess_input(df, scaler, label_encoder, binary_encoder, location_freq, g
     df = pd.get_dummies(df, columns=["type_of_project"], prefix="project", drop_first=False)
     df = binary_encoder.transform(df)
     df["material_grade"] = df["material_grade"].str.lower().map(grade_order).fillna(0)
-    df["num_of_bedroom_x_labour_rate"] = df["num_of_bedroom"] * df["Labour rate / hr"]
+    df["num_of_bedroom_x_labour_rate"] = df["num_of_bedroom"] * df["labour_rate_per_hr"]
 
     df = df.reindex(columns=selected_features, fill_value=0)
 
@@ -340,7 +346,7 @@ def add_labour_rate(data):
     if structural == "true":
         base_rate += 10
 
-    data["Labour rate / hr"] = int(round(base_rate))
+    data["labour_rate_per_hr"] = int(round(base_rate))
     return data
     
 

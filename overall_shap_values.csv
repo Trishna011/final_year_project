@@ -1,0 +1,11 @@
+feature,mean_abs_shap
+material_grade_x_labour_rate,0.1397395994848507
+property_size,0.13472996660159042
+sqft_renovated,0.10300284529369545
+sqft_to_add_to_property,0.06986460796840441
+renovation_type,0.06826705326806637
+structural_changes,0.05506477304645043
+labour_rate_per_hr,0.03929085744654755
+material_grade,0.007609602107138226
+location_x_labour_rate,0.00266404411418441
+Location,0.0016290969262614384
