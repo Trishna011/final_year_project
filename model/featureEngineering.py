@@ -297,7 +297,15 @@ def preprocess_input(df, scaler, label_encoder, target_encoder, location_freq, g
             .str.replace('-', ' ')  # unify hyphens and spaces
         )
 
-    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+
+    df["structural_changes"] = df["structural_changes"].replace({
+        "Yes": True,
+        "No": False
+    }).astype(bool)
+
+    #match scaling to sacling during training
+    numeric_cols = list(scaler.feature_names_in_)
+    df = df.reindex(columns=df.columns.union(numeric_cols, sort=False), fill_value=0)
     df[numeric_cols] = scaler.transform(df[numeric_cols])
 
     df["structural_changes"] = label_encoder.transform(df["structural_changes"])
@@ -308,14 +316,12 @@ def preprocess_input(df, scaler, label_encoder, target_encoder, location_freq, g
     df["location_x_material_grade"] = df["Location"] * df["material_grade"]
     
     df = df.reindex(columns=selected_features, fill_value=0)
-
     return df
 
 
 def prediction(input_json):
     input_df = pd.DataFrame([input_json])
     processed_df = preprocess_input(input_df, scaler, label_encoder, target_encoder, location_freq, grade_order, selected_features)
-
     y_pred_log = model.predict(processed_df)
     predicted_cost = np.expm1(y_pred_log)
     
@@ -358,7 +364,7 @@ def add_labour_rate(data):
     if structural == "true":
         base_rate *= 1.25
 
-    data["labour_rate_per_hr"] = int(round(base_rate))
+    data["labour_rate_per_hr"] = float(round(base_rate))
     return data
     
 

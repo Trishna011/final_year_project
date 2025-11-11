@@ -11,9 +11,7 @@ def predict():
     try:
         data = request.get_json()
         data = add_labour_rate(data)
-        print(data)
         cost = prediction(data)
-        print(cost)
         return jsonify({
             "predicted_cost": round(cost, 2),
             "currency": "GBP",
