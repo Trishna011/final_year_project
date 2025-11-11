@@ -1,12 +1,11 @@
 from flask import Flask, request, jsonify
+import traceback
+from flask_cors import CORS
 from model.featureEngineering import add_labour_rate, prediction
-import pandas as pd
-import numpy as np
-import joblib
-
-# --- Load model and preprocessing assets ---
 
 app = Flask(__name__)
+CORS(app)
+
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
@@ -14,14 +13,20 @@ def predict():
         data = add_labour_rate(data)
         print(data)
         cost = prediction(data)
-
-        response = {
+        print(cost)
+        return jsonify({
             "predicted_cost": round(cost, 2),
             "currency": "GBP",
             "message": "Prediction successful"
-        }
-        return jsonify(response), 200
+        }), 200
 
     except Exception as e:
+        print("❌ Full traceback:")
+        traceback.print_exc()
+        print("❌ Error message:", str(e))
         return jsonify({"error": str(e)}), 400
+
+    
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5001, debug=True)
 
