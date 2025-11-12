@@ -324,14 +324,16 @@ def prediction(input_json):
     processed_df = preprocess_input(input_df, scaler, label_encoder, target_encoder, location_freq, grade_order, selected_features)
     y_pred_log = model.predict(processed_df)
     predicted_cost = np.expm1(y_pred_log)
+
+    formatted_cost = f"{float(predicted_cost[0]):.2f}"
     
-    return float(predicted_cost[0])
+    return formatted_cost
 
 def add_labour_rate(data):
     #avg labour rate of nearby companies
     avg_labour_rate = np.mean([26,27,27,27,26,26,26,26,27,26,26,15,26,26,27,40,27,26,26,26,26,27,26,26,26])
 
-    base_rate = avg_labour_rate
+    base_rate = avg_labour_rate 
     grade = data.get("material_grade", "").lower()
     reno_type = data.get("renovation_type", "").lower()
     structural = data.get("structural_change", "").lower()

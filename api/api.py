@@ -13,7 +13,7 @@ def predict():
         data = add_labour_rate(data)
         cost = prediction(data)
         return jsonify({
-            "predicted_cost": round(cost, 2),
+            "predicted_cost": cost,
             "currency": "GBP",
             "message": "Prediction successful"
         }), 200
