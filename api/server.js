@@ -10,7 +10,7 @@ app.use(express.json());
 // 👇 Forward frontend data to Flask
 app.post("/api/estimate", async (req, res) => {
   try {
-    const flaskResponse = await fetch("http://localhost:5001/predict", {
+    const flaskResponse = await fetch("http://flask-api:5001/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),

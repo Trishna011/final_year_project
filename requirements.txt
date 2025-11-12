@@ -15,6 +15,7 @@ datasets==4.3.0
 dill==0.4.0
 filelock==3.20.0
 Flask==3.1.2
+Flask-Cors==4.0.0
 fonttools==4.60.1
 frozenlist==1.8.0
 fsspec==2025.9.0
