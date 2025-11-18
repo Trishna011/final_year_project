@@ -23,7 +23,8 @@ export default function Location({ onBack, onNext, answers }) {
     try {
       // ✅ Step 2: Send to server
       //http://localhost:4000/api/estimate
-      const res = await fetch("http://13.60.223.46:4000/api/estimate", {
+      //http://13.60.223.46:4000/api/estimate
+      const res = await fetch("/api/estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedAnswers),
