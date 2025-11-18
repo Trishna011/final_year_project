@@ -2,7 +2,7 @@ name: Deploy to AWS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build_and_deploy:
@@ -30,12 +30,8 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-north-1
 
-    - name: Deploy to S3
-      run: |
-        aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/ --delete
+    - name: Upload to S3
+      run: aws s3 sync build/ s3://${{ secrets.S3_BUCKET }}/ --delete
 
     - name: Invalidate CloudFront
-      run: |
-        aws cloudfront create-invalidation \
-          --distribution-id ${{ secrets.DISTRIBUTION_ID }} \
-          --paths "/*"
+      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
