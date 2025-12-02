@@ -5,7 +5,8 @@ import { useState } from "react";
 const MotionBox = motion(Box);
 
 export default function RenoType({ onBack, onNext, step }) {
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState([]);
+  console.log("Selected options length:", selectedOptions.length);
 
   const options = [
     { id: 1, label: "Full renovation" },
@@ -15,6 +16,14 @@ export default function RenoType({ onBack, onNext, step }) {
     { id: 5, label: "Living room" },
     { id: 6, label: "Other/Custom" },
   ];
+
+  const toggleOption = (label) => {
+    setSelectedOptions((prev) =>
+      prev.includes(label)
+        ? prev.filter((item) => item !== label) // remove if already selected
+        : [...prev, label] // add if not selected
+    );
+  };
 
   return (
     <Box
@@ -30,28 +39,30 @@ export default function RenoType({ onBack, onNext, step }) {
         What would you like to renovate?
       </Heading>
       <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={8}>
-        {options.map((option) => (
+        {options.map((option) => {
+          const isSelected = selectedOptions.includes(option.label);
+          
+          return (
           <MotionBox
             key={option.id}
             p={8}
             rounded="xl"
             borderWidth="2px"
-            borderColor={
-              selectedOption === option.label ? "teal.500" : "gray.200"
-            }
-            bg={selectedOption === option.label ? "teal.50" : "white"}
+            borderColor={isSelected ? "teal.500" : "gray.200"}
+            bg={isSelected ? "teal.50" : "white"}
             color="gray.700"
             textAlign="center"
             fontWeight="semibold"
             cursor="pointer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setSelectedOption(option.label)} // ✅ store label
-            transition={{ duration: 0.2 }}
-          >
+            onClick={() => toggleOption(option.label)}
+              transition={{ duration: 0.2 }}
+            >
             {option.label}
           </MotionBox>
-        ))}
+          );
+        })}
       </SimpleGrid>
 
       <Box mt={10}>
@@ -68,9 +79,10 @@ export default function RenoType({ onBack, onNext, step }) {
         <Button
           colorScheme="teal"
           rounded="full"
-          isDisabled={!selectedOption}
+          isDisabled={selectedOptions.length === 0}
           onClick={() => {
-            if (selectedOption) onNext({renovation_type: selectedOption }); // ✅ send label text to App.js
+            if (selectedOptions.length === 0) return;   // BLOCK navigation
+          onNext({ renovation_type: selectedOptions });
           }}
         >
           Next

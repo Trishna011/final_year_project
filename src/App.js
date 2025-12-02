@@ -10,6 +10,7 @@ import SqftToAdd from "./components/SqftToAdd";
 import StructChanges from "./components/StructChanges";
 import MaterialGrade from "./components/MaterialGrade";
 import CostPage from "./components/CostPage";
+import Location_local from "./components/Location_local"
 
 const MotionBox = motion(Box);
 
@@ -30,7 +31,6 @@ export default function App() {
     
     const updatedAnswers = { ...answers, ...data };
     setAnswers(updatedAnswers);
-    console.log(updatedAnswers);
 
     if (step < 8) {
       setStep(step + 1);
@@ -140,7 +140,8 @@ export default function App() {
           ) : step === 6 ? (
             <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 7 ? (
-            <Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            //<Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            <Location_local step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ):(
             <CostPage step={step} cost={answers.cost} onRestart={startOver} clearAnswers={clearAnswers} />
           )}
