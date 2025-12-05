@@ -26,7 +26,7 @@ export default function App() {
   const [answers, setAnswers] = useState({});
   const clearAnswers = () => {setAnswers({});
 };
-  
+  console.log("Selected options length:", answers);
   const handleNext = (data) => {
     
     const updatedAnswers = { ...answers, ...data };
@@ -119,12 +119,17 @@ export default function App() {
     )}
       
       {/* ✅ Single AnimatePresence handles all transitions */}
-      <AnimatePresence mode="wait">
+     <AnimatePresence mode="wait">
         <MotionBox
           key={currentKey}
           {...pageVariants}
           transition={pageTransition}
+          style={{ width: "100%" }}
+             w="100%" 
+            maxW="700px"         // default width for all pages
+            mx="auto"
         >
+          
           {!started ? (
             <LandingPage onStart={() => setStarted(true)} />
           ) : step === 1 ? (
@@ -132,7 +137,7 @@ export default function App() {
           ) : step === 2 ? (
             <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 3 ? (
-            <StructChanges step={step} onNext={handleNext} onBack={handleBack} />
+            <StructChanges step={step} onNext={handleNext} onBack={handleBack} answers={answers}/>
           ) : step === 4 ? (
             <SqftToReno step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 5 ? (
@@ -145,6 +150,8 @@ export default function App() {
           ):(
             <CostPage step={step} cost={answers.cost} onRestart={startOver} clearAnswers={clearAnswers} />
           )}
+        
+      
         </MotionBox>
       </AnimatePresence>
     </Box>

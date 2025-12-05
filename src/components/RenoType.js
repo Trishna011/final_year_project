@@ -6,7 +6,6 @@ const MotionBox = motion(Box);
 
 export default function RenoType({ onBack, onNext, step }) {
   const [selectedOptions, setSelectedOptions] = useState([]);
-  console.log("Selected options length:", selectedOptions.length);
 
   const options = [
     { id: 1, label: "Full renovation" },
@@ -77,17 +76,19 @@ export default function RenoType({ onBack, onNext, step }) {
         </Button>
 
         <Button
-          colorScheme="teal"
+          bg={selectedOptions.length === 0 ? "gray.600" : "black"}
+          color="white"
           rounded="full"
+          px={8}
+          opacity={selectedOptions.length === 0 ? 0.6 : 1}
+          cursor={selectedOptions.length === 0 ? "not-allowed" : "pointer"}
           isDisabled={selectedOptions.length === 0}
-          onClick={() => {
-            if (selectedOptions.length === 0) return;   // BLOCK navigation
-          onNext({ renovation_type: selectedOptions });
-          }}
+          onClick={() => selectedOptions.length > 0 && onNext({ renovation_type: selectedOptions })}
         >
           Next
         </Button>
       </Box>
+
     </Box>
   );
 }

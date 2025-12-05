@@ -1,74 +1,101 @@
-import { Box, Button, Heading, SimpleGrid } from "@chakra-ui/react";
+import { Box, Button, Heading, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
 const MotionBox = motion(Box);
 
-export default function StructChanges({ onBack, onNext, step }) {
-  const [selectedOption, setSelectedOption] = useState(null);
+export default function StructChanges({ onBack, onNext, answers }) {
+  const renovationTypes = answers.renovation_type || [];
+  const [selected, setSelected] = useState(
+    Array(renovationTypes.length).fill(null)
+  );
 
+  const updateSelection = (i, val) => {
+    const next = [...selected];
+    next[i] = val;
+    setSelected(next);
+  };
 
-  const options = [
-    { id: 1, label: "Yes" },
-    { id: 2, label: "No" },
-  ];
+  const allSelected = selected.every((v) => v !== null);
 
   return (
-    <Box
-      p={8}
-      bg="white"
-      rounded="2xl"
-      shadow="xl"
-      textAlign="center"
-      maxW="700px"
-      color="gray.800"
-    >
-      <Heading mb={8} textAlign="center">
-        Would you like to do any structual changes?
-      </Heading>
-
-      <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={8}>
-        {options.map((option) => (
+    <Box p={4} maxW="1000px" mx="auto" color="gray.800">
+      
+      <VStack spacing={6} w="100%">
+        {renovationTypes.map((type, index) => (
           <MotionBox
-            key={option.id}
-            p={8}
-            rounded="xl"
-            borderWidth="2px"
-            borderColor={
-              selectedOption === option.label ? "teal.500" : "gray.200"
-            }
-            bg={selectedOption === option.label ? "teal.50" : "white"}
-            color="gray.700"
-            textAlign="center"
-            fontWeight="semibold"
-            cursor="pointer"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setSelectedOption(option.label)}
-            transition={{ duration: 0.2 }}
+            key={`struct-${index}`}
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -40 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            p={6}
+            w="100%"
+            maxW="400px"
+            bg="white"
+            rounded="2xl"
+            shadow="md"
+            border="1px solid"
+            borderColor="gray.200"
+            overflow="auto"
+        
           >
-            {option.label}
+            <Text fontSize="lg" fontWeight="semibold" mb={3}>
+              {type}
+            </Text>
+
+            <Text fontSize="md" color="gray.600" mb={4}>
+              Any structural changes?
+            </Text>
+
+            <SimpleGrid columns={2} spacing={4}>
+              {["Yes", "No"].map((option) => (
+                <MotionBox
+                  key={option}
+                  p={3}
+                  rounded="xl"
+                  borderWidth="2px"
+                  borderColor={
+                    selected[index] === option ? "teal.500" : "gray.300"
+                  }
+                  bg={selected[index] === option ? "teal.50" : "white"}
+                  color={selected[index] === option ? "teal.700" : "black"}
+                  cursor="pointer"
+                  textAlign="center"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => updateSelection(index, option)}
+                  transition={{ duration: 0.2 }}
+                >
+                  {option}
+                </MotionBox>
+
+              ))}
+            </SimpleGrid>
           </MotionBox>
         ))}
-      </SimpleGrid>
+      </VStack>
 
-      <Box mt={10}>
+      {/* NAVIGATION */}
+      <Box textAlign="center" mt={10}>
         <Button
-          colorScheme="grey"
+          colorScheme="gray"
           rounded="full"
-          onClick={onBack}
           mr={4}
           variant="ghost"
+          onClick={onBack}
         >
           Back
         </Button>
-         <Button
-          colorScheme="teal"
+        <Button
+          bg={allSelected ? "black" : "gray.600"}
+          color="white"
           rounded="full"
-          isDisabled={!selectedOption}
-          onClick={() => {
-            if (selectedOption) onNext({structural_changes : selectedOption}); 
-          }}
+          cursor={allSelected ? "pointer" : "not-allowed"}
+          opacity={!allSelected ? 0.6 : 1}
+          px={8}
+          isDisabled={!allSelected}
+          onClick={() => allSelected && onNext({ structural_changes: selected })}
         >
           Next
         </Button>

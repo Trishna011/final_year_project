@@ -6,16 +6,10 @@ const MotionBox = motion(Box);
 
 export default function SqftToAdd({ onBack, onNext }) {
   const [addSqft, setAddSqft] = useState("");
-  const [showError, setShowError] = useState(false);
 
   const canProceed = addSqft.trim().length > 0;
 
   const handleNext = () => {
-    if (!canProceed) {
-      setShowError(true);
-      return;
-    }
-    setShowError(false);
     onNext({sqft_to_add_to_property : parseInt(addSqft)});
   };
 
@@ -25,7 +19,6 @@ export default function SqftToAdd({ onBack, onNext }) {
     // 👇 Allow only digits (no letters, symbols, or spaces)
     if (/^\d*$/.test(value)) {
       setAddSqft(value);
-      if (showError) setShowError(false);
     }
   };
 
@@ -47,7 +40,7 @@ export default function SqftToAdd({ onBack, onNext }) {
       <Heading mb={6}>Are you doing an extension?</Heading>
 
       {/* ✅ Input */}
-      <Field.Root invalid={showError && !canProceed}>
+      <Field.Root>
         <Input
           placeholder="Enter sqft to add - 0 if none"
           size="lg"
@@ -60,22 +53,7 @@ export default function SqftToAdd({ onBack, onNext }) {
         />
       </Field.Root>
 
-      {/* ✅ Error text centered under the input */}
-      {showError && !canProceed && (
-        <Box display="flex" justifyContent="center">
-          <Text
-            mt={2}
-            fontSize="sm"
-            color="red.500"
-            width="fit-content"
-            textAlign="center"
-          >
-            Please enter a value
-          </Text>
-        </Box>
-      )}
-
-      {/* ✅ Navigation buttons */}
+      {/* 🚀 Navigation */}
       <Box mt={8}>
         <Button
           colorScheme="gray"
@@ -86,7 +64,17 @@ export default function SqftToAdd({ onBack, onNext }) {
         >
           Back
         </Button>
-        <Button colorScheme="teal" rounded="full" onClick={handleNext}>
+
+        <Button
+          rounded="full"
+          px={8}
+          bg={canProceed ? "black" : "gray.600"}
+          color="white"
+          opacity={canProceed ? 1 : 0.6}
+          cursor={canProceed ? "pointer" : "not-allowed"}
+          isDisabled={!canProceed}
+          onClick={() => canProceed && onNext({ sqft_to_add_to_property: parseInt(addSqft) })}
+        >
           Next
         </Button>
       </Box>

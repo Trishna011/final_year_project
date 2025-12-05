@@ -96,7 +96,15 @@ export default function PropertySize({ onBack, onNext }) {
         >
           Back
         </Button>
-        <Button colorScheme="teal" rounded="full" onClick={handleNext}>
+        <Button 
+          rounded="full"
+          px={8}
+          bg={canProceed ? "black" : "gray.600"}
+          color="white"
+          opacity={canProceed ? 1 : 0.6}
+          cursor={canProceed ? "pointer" : "not-allowed"}
+          isDisabled={!canProceed} 
+          onClick={handleNext}>
           Next
         </Button>
       </Box>

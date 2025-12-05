@@ -103,10 +103,14 @@ export default function Location({ onBack, onNext, answers }) {
           Back
         </Button>
         <Button
-          colorScheme="teal"
+          bg={!selectedOption? "gray.600" : "black"}
+          color="white"
           rounded="full"
-          onClick={handleNext}
+          px={8}
+          opacity={!selectedOption? 0.6 : 1}
+          cursor={!selectedOption? "not-allowed" : "pointer"}
           isDisabled={!selectedOption}
+          onClick={handleNext}
         >
           Next
         </Button>
