@@ -1,83 +1,117 @@
-import { Box, Button, Heading, SimpleGrid } from "@chakra-ui/react";
+import { Box, Button, Heading, VStack, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
 const MotionBox = motion(Box);
 
-export default function MaterialGrade({ onBack, onNext }) {
-  const [selectedOption, setSelectedOption] = useState(null);
+export default function MaterialGrade({ onBack, onNext, answers }) {
+  const renovationTypes = answers?.renovation_type || [];
 
+  const [selectedMaterials, setSelectedMaterials] = useState(
+    Array(renovationTypes.length).fill("")
+  );
 
-  const options = [
-    { id: 1, label: "High-end" },
-    { id: 2, label: "Mid-range" },
-    { id: 3, label: "Budget-friendly" }
-  ];
+  const options = ["High-end", "Mid-range", "Budget-friendly"];
+
+  const handleChange = (index, value) => {
+    const updated = [...selectedMaterials];
+    updated[index] = value;
+    setSelectedMaterials(updated);
+  };
+
+  const allSelected = selectedMaterials.every((m) => m !== "");
 
   return (
-    <Box
+    <MotionBox
+      key="material-grade"
+      initial={{ opacity: 0, y: 80 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -80 }}
+      transition={{ duration: 0.6, ease: "easeInOut" }}
       p={8}
       bg="white"
       rounded="2xl"
       shadow="xl"
       textAlign="center"
       maxW="700px"
-      color="gray.800"
     >
-      <Heading mb={8} textAlign="center">
-        What type of material would you like to use?
-      </Heading>
+      <Heading mb={8}>Select material grade for each renovation area</Heading>
 
-      <SimpleGrid columns={1} spacing={4}>
-        {options.map((option) => (
-          <MotionBox
-            key={option.id}
-            p={8}
-            rounded="xl"
-            borderWidth="2px"
-            borderColor={
-              selectedOption === option.label ? "teal.500" : "gray.200"
-            }
-            bg={selectedOption === option.label ? "teal.50" : "white"}
-            color="gray.700"
-            textAlign="center"
-            fontWeight="semibold"
-            cursor="pointer"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setSelectedOption(option.label)}
-            transition={{ duration: 0.2 }}
+      <VStack spacing={6} w="100%">
+        {renovationTypes.map((type, index) => (
+          <Box
+            key={index}
+            p={6}
+            rounded="2xl"
+            border="1px solid"
+            borderColor="gray.300"
+            shadow="md"
+            w="100%"
+            textAlign="left"
           >
-            {option.label}
-          </MotionBox>
-        ))}
-      </SimpleGrid>
+            <Text fontWeight="bold" mb={3}>{type}</Text>
 
-      <Box mt={10}>
+            <Box
+              as="select"
+              size="lg"
+              rounded="full"
+              bg="white"
+              borderWidth="2px"
+              borderColor="teal.500"
+              px={4}
+              py={2}
+              w="100%"
+              value={selectedMaterials[index]}
+              onChange={(e) => handleChange(index, e.target.value)}
+              sx={{
+                appearance: "none",
+              }}
+              _focus={{
+                borderColor: "teal.500",
+                boxShadow: "0 0 0 2px rgba(56, 178, 172, 0.6) !important", // teal shadow
+                outline: "none",
+              }}
+              _focusVisible={{
+                borderColor: "teal.500",
+                outline: "none",
+                boxShadow: "none !important",
+              }}
+              _hover={{ borderColor: "teal.500" }}
+            >
+
+              <option value="">Choose material grade</option>
+              {options.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </Box>
+          </Box>
+        ))}
+      </VStack>
+
+      <Box mt={8}>
         <Button
-          colorScheme="grey"
+          colorScheme="gray"
           rounded="full"
-          onClick={onBack}
           mr={4}
           variant="ghost"
+          onClick={onBack}
         >
           Back
         </Button>
-         <Button
-          bg={!selectedOption? "gray.600" : "black"}
+
+        <Button
+          bg={allSelected ? "black" : "gray.600"}
           color="white"
           rounded="full"
           px={8}
-          opacity={!selectedOption? 0.6 : 1}
-          cursor={!selectedOption? "not-allowed" : "pointer"}
-          isDisabled={!selectedOption}
-          onClick={() => {
-            if (selectedOption) onNext({material_grade : selectedOption }); // ✅ trigger next step in App.js
-          }}
+          opacity={allSelected ? 1 : 0.6}
+          cursor={allSelected ? "pointer" : "not-allowed"}
+          isDisabled={!allSelected}
+          onClick={() => allSelected && onNext({ material_grades: selectedMaterials })}
         >
           Next
         </Button>
       </Box>
-    </Box>
+    </MotionBox>
   );
 }

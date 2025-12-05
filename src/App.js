@@ -141,7 +141,7 @@ export default function App() {
           ) : step === 4 ? (
             <SqftToReno step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 5 ? (
-            <MaterialGrade step={step} onNext={handleNext} onBack={handleBack} />
+            <MaterialGrade step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 6 ? (
             <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 7 ? (

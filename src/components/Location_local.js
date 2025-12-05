@@ -72,14 +72,28 @@ export default function Location({ onBack, onNext, answers }) {
         rounded="full"
         bg="white"
         borderWidth="2px"
-        borderColor="gray.300"
-        focusBorderColor="teal.500"
-        mb={8}
+        borderColor="teal.500"
         px={4}
         py={3}
         width="100%"
+        mb={8}
         value={selectedOption}
         onChange={(e) => setSelectedOption(e.target.value)}
+        sx={{
+          appearance: "none",
+          outline: "none",
+        }}
+        _focus={{
+          borderColor: "teal.500 !important",
+          boxShadow: "0 0 0 2px rgba(56, 178, 172, 0.6) !important", // subtle teal glow
+          outline: "none"
+        }}
+        _focusVisible={{
+          borderColor: "teal.500 !important",
+          boxShadow: "none !important",
+          outline: "none",
+        }}
+        _hover={{ borderColor: "teal.500" }}
       >
         <option value="">Select a location</option>
         {options
@@ -91,6 +105,7 @@ export default function Location({ onBack, onNext, answers }) {
             </option>
           ))}
       </Box>
+
 
       <Box mt={6}>
         <Button
