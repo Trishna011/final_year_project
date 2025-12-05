@@ -368,5 +368,25 @@ def add_labour_rate(data):
 
     data["labour_rate_per_hr"] = float(round(base_rate))
     return data
+
+def expand_records(data):
+    list_fields = ["material_grade", "renovation_type", "structural_changes"]
+
+    # Find the list length (assume all lists are same length)
+    max_len = len(data["material_grade"])
+
+    results = []
+    for i in range(max_len):
+        record = {}
+
+        for key, value in data.items():
+            if key in list_fields:
+                record[key] = value[i]  # take one value
+            else:
+                record[key] = value     # repeat scalar values
+
+        results.append(record)
+
+    return results
     
 

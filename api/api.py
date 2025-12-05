@@ -4,7 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from flask import Flask, request, jsonify
 import traceback
 from flask_cors import CORS
-from model.featureEngineering import add_labour_rate, prediction
+from model.featureEngineering import add_labour_rate, prediction, expand_records
 
 app = Flask(__name__)
 CORS(app)
@@ -13,19 +13,28 @@ CORS(app)
 def predict():
     try:
         data = request.get_json()
-        data = add_labour_rate(data)
-        cost = prediction(data)
+
+        # Convert into multiple grouped objects
+        expanded_data = expand_records(data)
+
+        print("🔹 Expanded Data:", expanded_data)
+
+        # 👉 Loop for prediction or handle based on your model logic
+        results = []
+        for d in expanded_data:
+            d = add_labour_rate(d)
+            cost = prediction(d)
+            results.append({**d, "predicted_cost": cost})
+
         return jsonify({
-            "predicted_cost": cost,
-            "currency": "GBP",
-            "message": "Prediction successful"
+            "result_sets": results,
+            "currency": "GBP"
         }), 200
 
     except Exception as e:
-        print("❌ Full traceback:")
         traceback.print_exc()
-        print("❌ Error message:", str(e))
         return jsonify({"error": str(e)}), 400
+
 
     
 if __name__ == "__main__":
