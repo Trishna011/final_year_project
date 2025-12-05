@@ -21,13 +21,16 @@ def predict():
 
         # 👉 Loop for prediction or handle based on your model logic
         results = []
+        total_cost = 0
         for d in expanded_data:
             d = add_labour_rate(d)
             cost = prediction(d)
             results.append({**d, "predicted_cost": cost})
-
+            total_cost += float(cost)
+        
         return jsonify({
             "result_sets": results,
+            "total_predicted_cost": total_cost,
             "currency": "GBP"
         }), 200
 
