@@ -34,7 +34,7 @@ export default function Location({ onBack, onNext, answers }) {
 
       // ✅ Step 3: Pass both updated answers + cost to parent
       onNext({
-        cost: data.predicted_cost
+        cost: data.total_predicted_cost
       });
     } catch (err) {
       onNext({

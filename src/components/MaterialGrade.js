@@ -107,7 +107,7 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
           opacity={allSelected ? 1 : 0.6}
           cursor={allSelected ? "pointer" : "not-allowed"}
           isDisabled={!allSelected}
-          onClick={() => allSelected && onNext({ material_grades: selectedMaterials })}
+          onClick={() => allSelected && onNext({ material_grade: selectedMaterials })}
         >
           Next
         </Button>
