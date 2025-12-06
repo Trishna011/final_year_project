@@ -5,18 +5,26 @@ import { useState } from "react";
 const MotionBox = motion(Box);
 
 export default function StructChanges({ onBack, onNext, answers }) {
-  const renovationTypes = answers.renovation_type || [];
-  const [selected, setSelected] = useState(
-    Array(renovationTypes.length).fill(null)
-  );
+  const bedroomCount = answers?.bedrooms_to_reno ?? 0;
+  const bathroomCount = answers?.bathrooms_to_reno ?? 0;
+  const renovationTypes = answers?.renovation_type ?? [];
 
-  const updateSelection = (i, val) => {
+  // Build card list just like SqftToAdd style
+  const roomList = [
+    ...Array.from({ length: bedroomCount }, (_, i) => `Bedroom ${i + 1}`),
+    ...Array.from({ length: bathroomCount }, (_, i) => `Bathroom ${i + 1}`),
+    ...renovationTypes.filter(t => !["Bedroom", "Bathroom"].includes(t)), // other rooms
+  ];
+
+  const [selected, setSelected] = useState(Array(roomList.length).fill(null));
+
+  const updateSelection = (index, val) => {
     const next = [...selected];
-    next[i] = val;
+    next[index] = val;
     setSelected(next);
   };
 
-  const allSelected = selected.every((v) => v !== null);
+  const allSelected = selected.every(v => v !== null);
 
   return (
     <MotionBox
@@ -29,15 +37,26 @@ export default function StructChanges({ onBack, onNext, answers }) {
       bg="white"
       rounded="2xl"
       shadow="xl"
-      textAlign="center"
       maxW="700px"
+      textAlign="center"
       color="gray.800"
     >
       <Heading mb={8}>Any structural changes required?</Heading>
 
-      {/* inner card container like MaterialGrade */}
-      <VStack spacing={6} w="100%">
-        {renovationTypes.map((type, index) => (
+      {/* Scrollable section same as SqftToAdd */}
+      <VStack
+        spacing={6}
+        w="100%"
+        maxH="400px"
+        overflowY="auto"
+        pr={2}
+        sx={{
+          "&::-webkit-scrollbar": { width: "6px" },
+          "&::-webkit-scrollbar-thumb": { background: "#d1d1d1", borderRadius: "10px" }
+        }}
+      >
+
+        {roomList.map((name, index) => (
           <Box
             key={index}
             p={6}
@@ -48,10 +67,12 @@ export default function StructChanges({ onBack, onNext, answers }) {
             w="100%"
             textAlign="left"
           >
-            <Text fontWeight="medium" fontSize="md" color="black" mb={1}>{type}</Text>
+            <Text fontWeight="medium" fontSize="md" color="black" mb={2}>
+              {name}
+            </Text>
 
             <SimpleGrid columns={2} spacing={4}>
-              {["Yes", "No"].map((option) => (
+              {["Yes", "No"].map(option => (
                 <MotionBox
                   key={option}
                   p={3}
@@ -75,23 +96,16 @@ export default function StructChanges({ onBack, onNext, answers }) {
         ))}
       </VStack>
 
-      {/* Navigation */}
+      {/* Buttons */}
       <Box mt={10}>
-        <Button
-          colorScheme="gray"
-          rounded="full"
-          mr={4}
-          variant="ghost"
-          onClick={onBack}
-        >
+        <Button variant="ghost" colorScheme="gray" rounded="full" mr={4} onClick={onBack}>
           Back
         </Button>
-
         <Button
-          bg={allSelected ? "black" : "gray.600"}
-          color="white"
           rounded="full"
           px={8}
+          bg={allSelected ? "black" : "gray.600"}
+          color="white"
           opacity={allSelected ? 1 : 0.6}
           cursor={allSelected ? "pointer" : "not-allowed"}
           isDisabled={!allSelected}

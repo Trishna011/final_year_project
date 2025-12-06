@@ -1,47 +1,58 @@
-import { Box, Button, Heading, Input, Field, Text } from "@chakra-ui/react";
+import { Box, Button, Heading, VStack, Input, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
 const MotionBox = motion(Box);
 
-export default function SqftToReno({ onBack, onNext }) {
-  const [sqft, setSqft] = useState("");
-  const [showError, setShowError] = useState(false);
+export default function SqftToReno({ onBack, onNext, answers }) {
+  const renovationTypes = answers?.renovation_type ?? [];
+  const bedroomCount = answers?.bedrooms_to_reno ?? 0;
+  const bathroomCount = answers?.bathrooms_to_reno ?? 0;
 
-  // ✅ Validation checks
-  const isEmpty = sqft.trim().length === 0;
-  const isZeroOrNegative = !isEmpty && Number(sqft) <= 0;
-  const canProceed = !isEmpty && !isZeroOrNegative;
+  // Build dynamic input structure just like SqftToAdd
+  const initialValues = {
+    bedrooms: Array(bedroomCount).fill(""),
+    bathrooms: Array(bathroomCount).fill(""),
+    other: renovationTypes
+      .filter(r => !["Bedroom", "Bathroom"].includes(r))
+      .reduce((acc, cur) => ({ ...acc, [cur]: "" }), {})
+  };
+
+  const [values, setValues] = useState(initialValues);
+
+  const handleUpdate = (group, indexOrKey, val) => {
+    if (/^\d*$/.test(val)) { // Only digits allowed
+      if (group === "other") {
+        setValues(prev => ({
+          ...prev,
+          other: { ...prev.other, [indexOrKey]: val }
+        }));
+      } else {
+        const copy = [...values[group]];
+        copy[indexOrKey] = val;
+        setValues(prev => ({ ...prev, [group]: copy }));
+      }
+    }
+  };
+
+  const allFilled =
+    values.bedrooms.every(v => v !== "") &&
+    values.bathrooms.every(v => v !== "") &&
+    Object.values(values.other).every(v => v !== "");
 
   const handleNext = () => {
-    if (!canProceed) {
-      setShowError(true);
-      return;
-    }
-    setShowError(false);
-    onNext({sqft_renovated : parseInt(sqft)});
+    onNext({
+      sqft_renovated: {
+        bedrooms: values.bedrooms.map(Number),
+        bathrooms: values.bathrooms.map(Number),
+        other: Object.fromEntries(Object.entries(values.other).map(([k, v]) => [k, Number(v)]))
+      }
+    });
   };
-
-  const handleInputChange = (e) => {
-    const value = e.target.value;
-
-    // ✅ Allow only digits
-    if (/^\d*$/.test(value)) {
-      setSqft(value);
-      if (showError) setShowError(false);
-    }
-  };
-
-  // ✅ Choose the right error message
-  let errorMessage = "";
-  if (showError) {
-    if (isEmpty) errorMessage = "Please enter a value.";
-    else if (isZeroOrNegative) errorMessage = "Please enter a number greater than 0.";
-  }
 
   return (
     <MotionBox
-      key="question6"
+      key="sqft-reno"
       initial={{ opacity: 0, y: 80 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -80 }}
@@ -50,79 +61,98 @@ export default function SqftToReno({ onBack, onNext }) {
       bg="white"
       rounded="2xl"
       shadow="xl"
-      textAlign="center"
       maxW="700px"
+      textAlign="center"
       color="gray.800"
     >
-      <Heading mb={6}>Number of sqft to be renovated?</Heading>
+      <Heading mb={8}>Sqft to Renovate</Heading>
 
-      {/* ✅ Input */}
-      <Field.Root invalid={showError && !canProceed}>
-        <Input
-          type="text"
-          placeholder="Enter the sqft to be renovated"
-          size="lg"
-          rounded="full"
-          textAlign="center"
-          fontSize="sm"
-          value={sqft}
-          onChange={handleInputChange}
-          focusBorderColor="teal.500"
-          _hover={{ borderColor: "teal.500" }}
-          _focus={{
-            borderColor: "teal.500",
-            boxShadow: "none",      // removes thick halo/glow
-            outline: "none"         // removes browser highlighting fallback
-          }}
+      {/* 🔥 Scrollable input list same as SqftToAdd */}
+      <VStack
+        spacing={6}
+        w="100%"
+        maxH="400px"
+        overflowY="auto"
+        pr={2}
+        sx={{
+          "&::-webkit-scrollbar": { width: "6px" },
+          "&::-webkit-scrollbar-thumb": { background: "#d1d1d1", borderRadius: "10px" }
+        }}
+      >
 
-          _focusVisible={{
-            borderColor: "teal.500",
-            boxShadow: "none",
-            outline: "none"
-          }}
+        {/* Bedrooms */}
+        {values.bedrooms.map((v, i) => (
+          <Box key={`bed-${i}`} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
+            <Text fontWeight="medium" fontSize="md" mb={1}>Bedroom {i + 1}</Text>
+            <Input
+              placeholder="Enter sqft to renovate"
+              rounded="full"
+              textAlign="center"
+              value={v}
+              onChange={(e) => handleUpdate("bedrooms", i, e.target.value)}
+              _hover={{ borderColor: "teal.500" }}
+              _focus={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              _focusVisible={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              transition="all .2s"
+            />
+          </Box>
+        ))}
 
-          transition="all .2s"
-        />
-      </Field.Root>
+        {/* Bathrooms */}
+        {values.bathrooms.map((v, i) => (
+          <Box key={`bath-${i}`} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
+            <Text fontWeight="medium" fontSize="md" mb={1}>Bathroom {i + 1}</Text>
+            <Input
+              placeholder="Enter sqft to renovate"
+              rounded="full"
+              textAlign="center"
+              value={v}
+              onChange={(e) => handleUpdate("bathrooms", i, e.target.value)}
+              _hover={{ borderColor: "teal.500" }}
+              _focus={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              _focusVisible={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              transition="all .2s"
+            />
+          </Box>
+        ))}
 
-      {/* ✅ Dynamic Error Message */}
-      {showError && errorMessage && (
-        <Box display="flex" justifyContent="center">
-          <Text
-            mt={2}
-            fontSize="sm"
-            color="red.500"
-            width="fit-content"
-            textAlign="center"
-          >
-            {errorMessage}
-          </Text>
-        </Box>
-      )}
+        {/* Other rooms selected */}
+        {Object.keys(values.other).map((room) => (
+          <Box key={room} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
+            <Text fontWeight="medium" fontSize="md" mb={1}>{room}</Text>
+            <Input
+              placeholder="Enter sqft to renovate"
+              rounded="full"
+              textAlign="center"
+              value={values.other[room]}
+              onChange={(e) => handleUpdate("other", room, e.target.value)}
+              _hover={{ borderColor: "teal.500" }}
+              _focus={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              _focusVisible={{ borderColor: "teal.500", boxShadow: "none", outline: "none" }}
+              transition="all .2s"
+            />
+          </Box>
+        ))}
+      </VStack>
 
-      {/* ✅ Buttons */}
-      <Box mt={8}>
-        <Button
-          colorScheme="gray"
-          rounded="full"
-          onClick={onBack}
-          mr={4}
-          variant="ghost"
-        >
+      <Box mt={10}>
+        <Button variant="ghost" colorScheme="gray" rounded="full" mr={4} onClick={onBack}>
           Back
         </Button>
-        <Button 
+        <Button
           rounded="full"
           px={8}
-          bg={canProceed ? "black" : "gray.600"}
+          bg={allFilled ? "black" : "gray.600"}
           color="white"
-          opacity={canProceed ? 1 : 0.6}
-          cursor={canProceed ? "pointer" : "not-allowed"}
-          isDisabled={!canProceed}
-        onClick={handleNext}>
+          opacity={allFilled ? 1 : 0.6}
+          cursor={allFilled ? "pointer" : "not-allowed"}
+          isDisabled={!allFilled}
+          onClick={allFilled ? handleNext : undefined}
+        >
           Next
         </Button>
       </Box>
+
     </MotionBox>
   );
 }
