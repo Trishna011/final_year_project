@@ -143,7 +143,7 @@ export default function App() {
               selected={answers.renovation_type} 
             />
           ) : step === 3 ? (
-            <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} />
+            <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 4 ? (
             <StructChanges step={step} onNext={handleNext} onBack={handleBack} answers={answers}/>
           ) : step === 5 ? (

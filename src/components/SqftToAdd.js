@@ -1,83 +1,167 @@
-import { Box, Button, Heading, Input, Field, Text } from "@chakra-ui/react";
+import { Box, Button, Heading, VStack, Input, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
 const MotionBox = motion(Box);
 
-export default function SqftToAdd({ onBack, onNext }) {
-  const [addSqft, setAddSqft] = useState("");
+export default function SqftToAdd({ onBack, onNext, answers }) {
+  const renovationTypes = answers?.renovation_type ?? [];
+  const bedroomCount = answers?.bedrooms_to_reno ?? 0;
+  const bathroomCount = answers?.bathrooms_to_reno ?? 0;
 
-  const canProceed = addSqft.trim().length > 0;
-
-  const handleNext = () => {
-    onNext({sqft_to_add_to_property : parseInt(addSqft)});
+  // Build grouped input lists
+  const initialValues = {
+    bedrooms: Array(bedroomCount).fill(""),
+    bathrooms: Array(bathroomCount).fill(""),
+    other: renovationTypes
+      .filter(r => !["Bedroom", "Bathroom"].includes(r))
+      .reduce((acc, cur) => ({ ...acc, [cur]: "" }), {})
   };
 
-  const handleInputChange = (e) => {
-    const value = e.target.value;
+  const [values, setValues] = useState(initialValues);
 
-    // 👇 Allow only digits (no letters, symbols, or spaces)
-    if (/^\d*$/.test(value)) {
-      setAddSqft(value);
+  const handleUpdate = (group, indexOrKey, val) => {
+    if (group === "other") {
+      setValues(prev => ({
+        ...prev,
+        other: { ...prev.other, [indexOrKey]: val }
+      }));
+    } else {
+      const copy = [...values[group]];
+      copy[indexOrKey] = val;
+      setValues(prev => ({ ...prev, [group]: copy }));
     }
+  };
+
+  const allFilled =
+    values.bedrooms.every(v => v !== "") &&
+    values.bathrooms.every(v => v !== "") &&
+    Object.values(values.other).every(v => v !== "");
+
+  const handleNext = () => {
+    onNext({
+      sqft_to_add: {
+        bedrooms: values.bedrooms.map(Number),
+        bathrooms: values.bathrooms.map(Number),
+        other: Object.fromEntries(
+          Object.entries(values.other).map(([k,v]) => [k, Number(v)])
+        )
+      }
+    });
   };
 
   return (
     <MotionBox
-      key="question7"
-      initial={{ opacity: 0, y: 80 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -80 }}
-      transition={{ duration: 0.6, ease: "easeInOut" }}
-      p={8}
-      bg="white"
-      rounded="2xl"
-      shadow="xl"
-      textAlign="center"
-      maxW="700px"
-      color="gray.800"
-    >
-      <Heading mb={6}>Are you doing an extension?</Heading>
+  key="sqft-add"
+  initial={{ opacity: 0, y: 80 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -80 }}
+  transition={{ duration: 0.6, ease: "easeInOut" }}
+  p={8}
+  bg="white"
+  rounded="2xl"
+  shadow="xl"
+  maxW="700px"
+  textAlign="center"
+  color="gray.800"
+>
 
-      {/* ✅ Input */}
-      <Field.Root>
+  <Heading mb={8}>Are you doing an extension?</Heading>
+
+  {/* 🔥 Scrollable card section */}
+  <VStack
+    spacing={6}
+    w="100%"
+    maxH="400px"        // adjust height to taste
+    overflowY="auto"
+    pr={2}
+    sx={{
+      "&::-webkit-scrollbar": { width: "6px" },
+      "&::-webkit-scrollbar-thumb": {
+        background: "#d1d1d1",
+        borderRadius: "10px"
+      }
+    }}
+  >
+    {/* Bedroom Cards */}
+    {values.bedrooms.map((v, i) => (
+      <Box
+        key={`bed-${i}`}
+        p={6}
+        rounded="2xl"
+        border="1px solid"
+        borderColor="gray.300"
+        shadow="md"
+        w="100%"
+        textAlign="left"
+      >
+      <Text fontWeight="medium" fontSize="md" color="gray.700" mb={1}>Bedroom {i+1} Sqft</Text>
         <Input
-          placeholder="Enter sqft to add - 0 if none"
-          size="lg"
+          placeholder="Enter sqft (0 if none)"
           rounded="full"
           textAlign="center"
-          fontSize="sm"
-          value={addSqft}
-          onChange={handleInputChange}
-          focusBorderColor="teal.500"
+          value={v}
+          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bedrooms", i, e.target.value)}
+          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
+          _hover={{ borderColor: "teal.400" }}
         />
-      </Field.Root>
-
-      {/* 🚀 Navigation */}
-      <Box mt={8}>
-        <Button
-          colorScheme="gray"
-          rounded="full"
-          onClick={onBack}
-          mr={4}
-          variant="ghost"
-        >
-          Back
-        </Button>
-
-        <Button
-          rounded="full"
-          px={8}
-          bg={canProceed ? "black" : "gray.600"}
-          color="white"
-          opacity={canProceed ? 1 : 0.6}
-          cursor={canProceed ? "pointer" : "not-allowed"}
-          isDisabled={!canProceed}
-          onClick={() => canProceed && onNext({ sqft_to_add_to_property: parseInt(addSqft) })}
-        >
-          Next
-        </Button>
       </Box>
-    </MotionBox>
+    ))}
+
+    {/* Bathroom Cards */}
+    {values.bathrooms.map((v, i) => (
+      <Box key={`bath-${i}`} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
+        <Text fontWeight="medium" fontSize="md" color="gray.700" >Bathroom {i+1} Sqft</Text>
+        <Input placeholder="Enter sqft (0 if none)" rounded="full" textAlign="center"
+          value={v}
+          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bathrooms", i, e.target.value)}
+          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
+          _hover={{ borderColor: "teal.400" }}
+        />
+      </Box>
+    ))}
+
+    {/* Other rooms */}
+    {Object.keys(values.other).map((room) => (
+      <Box key={room} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
+        <Text fontWeight="medium" fontSize="md" color="gray.700">{room} Sqft</Text>
+        <Input placeholder="Enter sqft (0 if none)" rounded="full" textAlign="center"
+          value={values.other[room]}
+          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("other", room, e.target.value)}
+          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
+          _hover={{ borderColor: "teal.400" }}
+        />
+      </Box>
+    ))}
+  </VStack>
+
+  {/* Buttons stay outside scroll */}
+  <Box mt={10}>
+  <Button
+    variant="ghost"
+    colorScheme="gray"
+    rounded="full"
+    mr={4}
+    onClick={onBack}
+  >
+    Back
+  </Button>
+
+  <Button
+    rounded="full"
+    px={8}
+    bg={allFilled ? "black" : "gray.600"}
+    color="white"
+    opacity={allFilled ? 1 : 0.6}
+    cursor={allFilled ? "pointer" : "not-allowed"}
+    isDisabled={!allFilled}
+    onClick={allFilled ? handleNext : undefined}   // ⬅ stops click when invalid
+  >
+    Next
+  </Button>
+</Box>
+
+</MotionBox>
+
   );
 }
