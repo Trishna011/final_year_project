@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: property-renovation-flask:latest
     ports:
       - "5001:5001"
 
@@ -12,6 +13,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.node
+    image: property-renovation-node:latest
     ports:
       - "4000:4000"
     depends_on:
