@@ -33,37 +33,49 @@ export default function App() {
     const updatedAnswers = { ...answers, ...data };
     setAnswers(updatedAnswers);
 
-    // 👇 If RenoType step and user selected Bedroom/Bathroom → redirect to new step
-    if (step === 1 && (data.renovation_type.includes("Bedroom") || data.renovation_type.includes("Bathroom"))) {
-      setStep(2); // new mid-step
-      return;
+    // If step 1 was RenoType:
+    if (step === 1) {
+      const selected = data.renovation_type || [];
+
+      // 👉 If NO Bedroom/Bathroom was selected — skip step 2
+      if (!selected.includes("Bedroom") && !selected.includes("Bathroom")) {
+        setStep(3); // jump straight to SqftToAdd
+        return;
+      }
+
+      // 👉 If Bedroom or Bathroom selected — go to BedBathCount
+      if (selected.includes("Bedroom") || selected.includes("Bathroom")) {
+        setStep(2);
+        return;
+      }
     }
 
     setStep(step + 1);
   };
 
+
   const handleBack = () => {
-  if (step === 1) {
-    setStarted(false);
-    return;
-  }
-
-  setAnswers((prev) => {
-    
-    const newAnswers = { ...prev };
-   
-    const keys = Object.keys(newAnswers);
-
-    const lastKey = keys[keys.length - 1];
-    if (lastKey) {
-      delete newAnswers[lastKey];
+    if (step === 1) {
+      setStarted(false);
+      return;
     }
-    return newAnswers;
-  });
 
- 
-  setStep(step - 1);
-};
+    // If user is on Step 3 AND Bedroom/Bathroom were NOT selected
+    if (step === 3 && !(answers.renovation_type?.includes("Bedroom") || answers.renovation_type?.includes("Bathroom"))) {
+      setStep(1); // go back to reno type
+      return;
+    }
+
+    // If user is on Step 3 AND Bedroom/Bathroom WERE selected → go to BedBathCount
+    if (step === 3 && (answers.renovation_type?.includes("Bedroom") || answers.renovation_type?.includes("Bathroom"))) {
+      setStep(2);
+      return;
+    }
+
+    // Normal back behaviour otherwise
+    setStep(step - 1);
+  };
+
 
   const startOver = () => {
     setStarted(false); 
@@ -136,12 +148,13 @@ export default function App() {
             <LandingPage onStart={() => setStarted(true)} />
           ) : step === 1 ? (
             <RenoType step={step} onNext={handleNext} onBack={handleBack} />
-          ) : step === 2 ? (
+          ) : step === 2 && (answers.renovation_type?.includes("Bedroom") || answers.renovation_type?.includes("Bathroom")) ? (
             <BedBathCount 
               onNext={handleNext} 
               onBack={()=> setStep(1)} 
               selected={answers.renovation_type} 
             />
+
           ) : step === 3 ? (
             <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 4 ? (
