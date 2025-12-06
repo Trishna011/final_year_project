@@ -370,23 +370,75 @@ def add_labour_rate(data):
     return data
 
 def expand_records(data):
-    list_fields = ["material_grade", "renovation_type", "structural_changes"]
+    renovation_types = data.get("renovation_type", [])
+    bedrooms = data.get("bedrooms_to_reno", 0)
+    bathrooms = data.get("bathrooms_to_reno", 0)
 
-    # Find the list length (assume all lists are same length)
-    max_len = len(data["material_grade"])
+    sqft_add = data.get("sqft_to_add", {})
+    sqft_reno = data.get("sqft_renovated", {})
 
-    results = []
-    for i in range(max_len):
-        record = {}
+    material_raw = data.get("material_grade", {})
+    struct_raw = data.get("structural_changes", [])
 
-        for key, value in data.items():
-            if key in list_fields:
-                record[key] = value[i]  # take one value
-            else:
-                record[key] = value     # repeat scalar values
+    # ---------- Convert material dict into lists ----------
+    material = {
+        "bedrooms": material_raw.get("bedrooms", []) if isinstance(material_raw, dict) else [],
+        "bathrooms": material_raw.get("bathrooms", []) if isinstance(material_raw, dict) else [],
+        "other": material_raw.get("other", {}) if isinstance(material_raw, dict) else {}
+    }
 
-        results.append(record)
+    # ---------- Convert structural list → bedrooms/bathrooms/other chunks ----------
+    total_units = bedrooms + bathrooms + len([t for t in renovation_types if t not in ["Bedroom","Bathroom"]])
 
-    return results
-    
+    # pad list to avoid index error
+    struct_raw = (struct_raw + [""] * total_units)[:total_units]
 
+    struct = {
+        "bedrooms": struct_raw[:bedrooms],
+        "bathrooms": struct_raw[bedrooms:bedrooms+bathrooms],
+        "other": struct_raw[bedrooms+bathrooms:]
+    }
+
+    base_shared = {
+        "property_size": data.get("property_size"),
+        "Location": data.get("Location"),
+    }
+
+    output = []
+
+    # ---------- Bedrooms ----------
+    for i in range(bedrooms):
+        output.append({
+            **base_shared,
+            "renovation_type": "Bedroom",
+            "sqft_to_add_to_property": sqft_add.get("bedrooms",[0])[i],
+            "sqft_renovated": sqft_reno.get("bedrooms",[0])[i],
+            "material_grade": material["bedrooms"][i] if i < len(material["bedrooms"]) else "",
+            "structural_changes": struct["bedrooms"][i],
+        })
+
+    # ---------- Bathrooms ----------
+    for i in range(bathrooms):
+        output.append({
+            **base_shared,
+            "renovation_type": "Bathroom",
+            "sqft_to_add_to_property": sqft_add.get("bathrooms",[0])[i],
+            "sqft_renovated": sqft_reno.get("bathrooms",[0])[i],
+            "material_grade": material["bathrooms"][i] if i < len(material["bathrooms"]) else "",
+            "structural_changes": struct["bathrooms"][i],
+        })
+
+    # ---------- Other room types ----------
+    other_rooms = [t for t in renovation_types if t not in ["Bedroom","Bathroom"]]
+
+    for idx, room in enumerate(other_rooms):
+        output.append({
+            **base_shared,
+            "renovation_type": room,
+            "sqft_to_add_to_property": sqft_add.get("other",{}).get(room,0),
+            "sqft_renovated": sqft_reno.get("other",{}).get(room,0),
+            "material_grade": material["other"].get(room,""),
+            "structural_changes": struct["other"][idx] if idx < len(struct["other"]) else "",
+        })
+
+    return output
