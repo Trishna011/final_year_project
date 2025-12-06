@@ -49,14 +49,14 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
             w="100%"
             textAlign="left"
           >
-            <Text fontWeight="bold" mb={3}>{type}</Text>
+            <Text fontWeight="medium" fontSize="md" color="black">{type}</Text>
 
             <Box
               as="select"
               size="lg"
               rounded="full"
               bg="white"
-              borderWidth="2px"
+              borderWidth="1px"
               borderColor="teal.500"
               px={4}
               py={2}

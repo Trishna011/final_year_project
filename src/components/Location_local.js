@@ -71,7 +71,7 @@ export default function Location({ onBack, onNext, answers }) {
         size="lg"
         rounded="full"
         bg="white"
-        borderWidth="2px"
+        borderWidth="1px"
         borderColor="teal.500"
         px={4}
         py={3}

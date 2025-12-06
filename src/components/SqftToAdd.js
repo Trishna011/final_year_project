@@ -95,15 +95,27 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
         w="100%"
         textAlign="left"
       >
-      <Text fontWeight="medium" fontSize="md" color="gray.700" mb={1}>Bedroom {i+1} Sqft</Text>
+      <Text fontWeight="medium" fontSize="md" color="black" mb={1}>Bedroom {i+1} Sqft</Text>
         <Input
           placeholder="Enter sqft (0 if none)"
           rounded="full"
           textAlign="center"
           value={v}
           onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bedrooms", i, e.target.value)}
-          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
-          _hover={{ borderColor: "teal.400" }}
+          _hover={{ borderColor: "teal.500" }}
+          _focus={{
+            borderColor: "teal.500",
+            boxShadow: "none",      // removes thick halo/glow
+            outline: "none"         // removes browser highlighting fallback
+          }}
+
+          _focusVisible={{
+            borderColor: "teal.500",
+            boxShadow: "none",
+            outline: "none"
+          }}
+
+          transition="all .2s"
         />
       </Box>
     ))}
@@ -111,12 +123,24 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     {/* Bathroom Cards */}
     {values.bathrooms.map((v, i) => (
       <Box key={`bath-${i}`} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
-        <Text fontWeight="medium" fontSize="md" color="gray.700" >Bathroom {i+1} Sqft</Text>
+        <Text fontWeight="medium" fontSize="md" color="black" >Bathroom {i+1} Sqft</Text>
         <Input placeholder="Enter sqft (0 if none)" rounded="full" textAlign="center"
           value={v}
           onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bathrooms", i, e.target.value)}
-          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
-          _hover={{ borderColor: "teal.400" }}
+          _hover={{ borderColor: "teal.500" }}
+          _focus={{
+            borderColor: "teal.500",
+            boxShadow: "none",      // removes thick halo/glow
+            outline: "none"         // removes browser highlighting fallback
+          }}
+
+          _focusVisible={{
+            borderColor: "teal.500",
+            boxShadow: "none",
+            outline: "none"
+          }}
+
+          transition="all .2s"
         />
       </Box>
     ))}
@@ -124,12 +148,24 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     {/* Other rooms */}
     {Object.keys(values.other).map((room) => (
       <Box key={room} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
-        <Text fontWeight="medium" fontSize="md" color="gray.700">{room} Sqft</Text>
+        <Text fontWeight="medium" fontSize="md" color="black">{room} Sqft</Text>
         <Input placeholder="Enter sqft (0 if none)" rounded="full" textAlign="center"
           value={values.other[room]}
           onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("other", room, e.target.value)}
-          _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 2px rgba(56,178,172,.3)" }}
-          _hover={{ borderColor: "teal.400" }}
+          _hover={{ borderColor: "teal.500" }}
+          _focus={{
+            borderColor: "teal.500",
+            boxShadow: "none",      // removes thick halo/glow
+            outline: "none"         // removes browser highlighting fallback
+          }}
+
+          _focusVisible={{
+            borderColor: "teal.500",
+            boxShadow: "none",
+            outline: "none"
+          }}
+
+          transition="all .2s"
         />
       </Box>
     ))}

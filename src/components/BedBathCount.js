@@ -48,7 +48,7 @@ export default function BedBathCount({ onNext, onBack, selected }) {
       <VStack spacing={6}>
         {selected.includes("Bedroom") && (
           <Box>
-            <Heading size="md" mb={2}>Bedrooms to Renovate</Heading>
+            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>Bedrooms to Renovate</Heading>
             <Input
               type="number"
               min={1}
@@ -57,16 +57,29 @@ export default function BedBathCount({ onNext, onBack, selected }) {
               width="150px"
               textAlign="center"
               rounded="full"
-              borderWidth="2px"
+              borderWidth="1px"
               borderColor="teal.500"
-              _focus={{ borderColor:"teal.500" }}
+              _hover={{ borderColor: "teal.500" }}
+              _focus={{
+                borderColor: "teal.500",
+                boxShadow: "none",      // removes thick halo/glow
+                outline: "none"         // removes browser highlighting fallback
+              }}
+
+              _focusVisible={{
+                borderColor: "teal.500",
+                boxShadow: "none",
+                outline: "none"
+              }}
+
+              transition="all .2s"
             />
           </Box>
         )}
 
         {selected.includes("Bathroom") && (
           <Box>
-            <Heading size="md" mb={2}>Bathrooms to Renovate</Heading>
+            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>Bathrooms to Renovate</Heading>
             <Input
               type="number"
               min={1}
@@ -75,9 +88,22 @@ export default function BedBathCount({ onNext, onBack, selected }) {
               width="150px"
               textAlign="center"
               rounded="full"
-              borderWidth="2px"
+              borderWidth="1px"
               borderColor="teal.500"
-              _focus={{ borderColor:"teal.500" }}
+              _hover={{ borderColor: "teal.500" }}
+              _focus={{
+                borderColor: "teal.500",
+                boxShadow: "none",      // removes thick halo/glow
+                outline: "none"         // removes browser highlighting fallback
+              }}
+
+              _focusVisible={{
+                borderColor: "teal.500",
+                boxShadow: "none",
+                outline: "none"
+              }}
+
+              transition="all .2s"
             />
           </Box>
         )}

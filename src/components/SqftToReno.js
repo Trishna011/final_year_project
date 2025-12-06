@@ -68,6 +68,20 @@ export default function SqftToReno({ onBack, onNext }) {
           value={sqft}
           onChange={handleInputChange}
           focusBorderColor="teal.500"
+          _hover={{ borderColor: "teal.500" }}
+          _focus={{
+            borderColor: "teal.500",
+            boxShadow: "none",      // removes thick halo/glow
+            outline: "none"         // removes browser highlighting fallback
+          }}
+
+          _focusVisible={{
+            borderColor: "teal.500",
+            boxShadow: "none",
+            outline: "none"
+          }}
+
+          transition="all .2s"
         />
       </Field.Root>
 

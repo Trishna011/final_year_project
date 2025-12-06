@@ -48,7 +48,7 @@ export default function StructChanges({ onBack, onNext, answers }) {
             w="100%"
             textAlign="left"
           >
-            <Text fontWeight="bold" fontSize="lg" mb={2}>{type}</Text>
+            <Text fontWeight="medium" fontSize="md" color="black" mb={1}>{type}</Text>
 
             <SimpleGrid columns={2} spacing={4}>
               {["Yes", "No"].map((option) => (

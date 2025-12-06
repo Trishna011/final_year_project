@@ -66,7 +66,24 @@ export default function PropertySize({ onBack, onNext }) {
           fontSize="sm"
           value={size}
           onChange={handleInputChange}
-          focusBorderColor="teal.500"
+
+          borderColor="gray.300"
+          _hover={{ borderColor: "teal.500" }}
+
+          // 🔥 makes hover & focus identical
+          _focus={{
+            borderColor: "teal.500",
+            boxShadow: "none",      // removes thick halo/glow
+            outline: "none"         // removes browser highlighting fallback
+          }}
+
+          _focusVisible={{
+            borderColor: "teal.500",
+            boxShadow: "none",
+            outline: "none"
+          }}
+
+          transition="all .2s"
         />
       </Field.Root>
 
