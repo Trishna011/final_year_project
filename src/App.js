@@ -11,6 +11,7 @@ import StructChanges from "./components/StructChanges";
 import MaterialGrade from "./components/MaterialGrade";
 import CostPage from "./components/CostPage";
 import Location_local from "./components/Location_local"
+import BedBathCount from "./components/BedBathCount"
 
 const MotionBox = motion(Box);
 
@@ -27,18 +28,19 @@ export default function App() {
   const clearAnswers = () => {setAnswers({});
 };
   console.log("Selected options length:", answers);
+  
   const handleNext = (data) => {
-    
     const updatedAnswers = { ...answers, ...data };
     setAnswers(updatedAnswers);
 
-    if (step < 8) {
-      setStep(step + 1);
-    } else {
-      // ✅ After the last step, go to CostPage
-      setStep(8);
+    // 👇 If RenoType step and user selected Bedroom/Bathroom → redirect to new step
+    if (step === 1 && (data.renovation_type.includes("Bedroom") || data.renovation_type.includes("Bathroom"))) {
+      setStep(2); // new mid-step
+      return;
     }
-  } ;
+
+    setStep(step + 1);
+  };
 
   const handleBack = () => {
   if (step === 1) {
@@ -110,7 +112,7 @@ export default function App() {
             <Box
               h="100%"
               bg="teal.400"
-              w={`${(step / 8) * 100}%`}
+              w={`${(step / 9) * 100}%`}
               transition="width 0.5s ease-in-out"
             />
           </Box>
@@ -135,16 +137,22 @@ export default function App() {
           ) : step === 1 ? (
             <RenoType step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 2 ? (
-            <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} />
+            <BedBathCount 
+              onNext={handleNext} 
+              onBack={()=> setStep(1)} 
+              selected={answers.renovation_type} 
+            />
           ) : step === 3 ? (
-            <StructChanges step={step} onNext={handleNext} onBack={handleBack} answers={answers}/>
+            <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 4 ? (
-            <SqftToReno step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            <StructChanges step={step} onNext={handleNext} onBack={handleBack} answers={answers}/>
           ) : step === 5 ? (
-            <MaterialGrade step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            <SqftToReno step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 6 ? (
-            <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
+            <MaterialGrade step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ) : step === 7 ? (
+            <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
+          ) : step === 8 ? (
             //<Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
             <Location_local step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ):(
