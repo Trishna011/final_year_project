@@ -133,14 +133,14 @@ def clean_text(text):
 
     doc = nlp(text)
 
-    lemmas = [
-        token.lemma_
+    tokens = [
+        token.text
         for token in doc
-        if (token.is_alpha or token.is_digit or token.like_num)
-        and not token.is_stop
-    ]
+            if (token.is_alpha or token.is_digit or token.like_num)
+            and not token.is_stop
+            ]
 
-    return " ".join(lemmas)
+    return " ".join(tokens)
 
 real_df["description"] = real_df["description"].apply(clean_text)
 
