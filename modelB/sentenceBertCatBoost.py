@@ -8,72 +8,140 @@ df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
 
 nlp = spacy.load("en_core_web_md")
 
-STRUCTURAL_ANCHORS = [
-    "extension", "extended", "loft", "conversion",
-    "structural", "alteration"
+STRUCTURAL_LEMMAS = {
+    "extend",
+    "extension",
+    "convert",
+    "conversion",
+    "loft",
+    "alter",
+    "alteration",
+    "structural"
+}
+
+
+RENOVATION_PATTERNS = [
+    r"\bnewly renovated\b",
+    r"\brecently renovated\b",
+    r"\brenovat\w*\b",
+    r"\brefurbish\w*\b",
+    r"\bnewly refurbished\b",
+    r"\bcompletely refurbished\b",
+    r"\bmoderni[sz]e\w*\b",
+    r"\bmodernized\b",
+    r"\bupgrade\w*\b",
+    r"\brefit\w*\b",
+    r"\bfinished to a high standard\b",
+    r"\brecently upgraded\b",
+    r"\bhigh\s+standard\b",
+    r"\bimmaculate\b",
+    r"\bpristine\b"
 ]
 
-STRUCTURAL_CONTEXT = [
-    "planning", "permission", "rear", "side", "storey"
+RENOVATION_SEED_WORDS = [
+    "renovated",
+    "refurbished",
+    "modernised",
+    "upgraded",
+    "refitted",
+    "installed"
 ]
 
-RENOVATION_ANCHORS = [
-"kitchen",
-"bathroom",
-"bedroom",
-"living",
-"refurbish",
-"renovate",
-"modernise",
-"upgrade"
-]
+RENOVATION_SEED_DOCS = [nlp(w) for w in RENOVATION_SEED_WORDS]
 
-RENOVATION_CONTEXT = [
-"new",
-"refitted",
-"installed",
-"updated",
-"fully",
-"recently"
-]
-
-RENOVATION_VERBS = [
-    "fit", "fitted", "install", "installed",
-    "upgrade", "upgraded", "refurbish", "refurbished",
-    "renovate", "renovated", "modernise", "modernised"
-]
+RENOVATION_TEMPORAL_CUES = {
+    "recent",
+    "recently",
+    "new",
+    "newly",
+    "just",
+    "now"
+}
 
 ROOM_NOUNS = [
     "kitchen", "bathroom", "bedroom", "living", "lounge"
 ]
-RENOVATION_ADJECTIVES = [
-    "stylish",
-    "modern",
-    "contemporary",
-    "luxurious",
-    "sleek",
-    "designer",
-    "high spec",
-    "integrated",
-    "open plan"
-]
 
-QUALITY_CUES = [
-"new",
-"recent",
-"recently",
-"refitted",
-"installed",
-"upgraded",
-"bespoke"
-]
+STATE_VERBS = {
+    "offer", "offers",
+    "provide", "provides",
+    "include", "includes",
+    "feature", "features",
+    "comprise", "comprises"
+}
 
-ANCHOR_STRUCTURAL_DOCS = [nlp(w) for w in STRUCTURAL_ANCHORS]
-ANCHOR_RENOVATION_DOCS = [nlp(w) for w in RENOVATION_ANCHORS]
-RENOVATION_VERB_DOCS = [nlp(w) for w in RENOVATION_VERBS]
+
+
 ROOM_NOUN_DOCS = [nlp(w) for w in ROOM_NOUNS]
-RENOVATION_ADJ_DOCS = [nlp(w) for w in RENOVATION_ADJECTIVES]
-QUALITY_CUE_DOCS = [nlp(w) for w in QUALITY_CUES]
+
+
+def is_semantic_renovation_token(token, threshold=0.65):
+    # only allow verbs and adjectives
+    if token.pos_ not in {"VERB", "ADJ"}:
+        return False
+
+    # block generic state and marketing words
+    if token.lemma_ in STATE_VERBS:
+        return False
+
+    # similarity check against renovation seeds
+    for seed in RENOVATION_SEED_DOCS:
+        if token.similarity(seed) >= threshold:
+            return True
+
+    return False
+
+def has_temporal_cue(window):
+    return any(t.lemma_ in RENOVATION_TEMPORAL_CUES for t in window)
+
+def is_room_noun(token, threshold=0.65):
+    for r in ROOM_NOUN_DOCS:
+        if token.similarity(r) >= threshold:
+            return r.text
+    return None
+
+def embedding_renovation_detector(text, window_size=30):
+    text = str(text).lower()
+    doc = nlp(text)
+
+    renovated_rooms = set()
+    generic_renovation = False
+
+    for token in doc:
+        if not is_semantic_renovation_token(token):
+            continue
+
+        start = max(token.i - window_size, 0)
+        end = min(token.i + window_size + 1, len(doc))
+        window = doc[start:end]
+
+        if not has_temporal_cue(window):
+            continue
+
+        room_found = False
+
+        for t in window:
+            if t.pos_ == "NOUN":
+                room = is_room_noun(t)
+                if room:
+                    if room in {"living", "lounge"}:
+                        room = "living room"
+                    if room == "bath":
+                        room = "bathroom"
+
+                    renovated_rooms.add(room)
+                    room_found = True
+
+        if not room_found:
+            generic_renovation = True
+
+    if renovated_rooms:
+        return list(renovated_rooms)
+
+    if generic_renovation:
+        return ["other/custom"]
+
+    return np.nan
 
 def extract_material_grade(text):
     high = [
@@ -91,138 +159,19 @@ def extract_material_grade(text):
         return 'low'
     return np.nan
 
-def embedding_structural_detector(text, similarity_threshold=0.65):
-    doc = nlp(text)
 
-    for token in doc:
-        if not token.is_alpha:
-            continue
-
-        for anchor in ANCHOR_STRUCTURAL_DOCS:
-            if token.similarity(anchor) >= similarity_threshold:
-                window = doc[max(token.i - 5, 0): min(token.i + 6, len(doc))]
-                window_text = window.text.lower()
-
-                if any(c in window_text for c in STRUCTURAL_CONTEXT):
-                    return 1
-
-    return 0
-
-def is_renovation_adjective(token, threshold=0.65):
-    if token.pos_ != "ADJ":
-        return False
-
-    for adj in RENOVATION_ADJ_DOCS:
-        if token.similarity(adj) >= threshold:
-            return True
-
-    return False
-
-def is_quality_cue(token, threshold=0.65):
-    if token.pos_ not in {"ADJ", "ADV", "VERB"}:
-        return False
-
-    for q in QUALITY_CUE_DOCS:
-        if token.similarity(q) >= threshold:
-            return True
-
-    return False
-
-def is_renovation_verb(token, threshold=0.65):
-    for v in RENOVATION_VERB_DOCS:
-        if token.similarity(v) >= threshold:
-            return True
-    return False
-
-
-def is_room_noun(token, threshold=0.65):
-    for r in ROOM_NOUN_DOCS:
-        if token.similarity(r) >= threshold:
-            return r.text
-    return None
-
-
-def embedding_renovation_detector(text, similarity_threshold=0.65):
+def extract_structural_changes(text):
     text = str(text).lower()
     doc = nlp(text)
 
-    full_reno_phrases = [
-        "fully refurbished",
-        "fully renovated",
-        "renovated throughout",
-        "completely renovated",
-        "full refurbishment",
-        "entire property",
-        "throughout the property"
-    ]
-
-    if any(p in text for p in full_reno_phrases):
-        return "full renovation"
-
-    found = set()
-
-    # pass 1: explicit renovation actions
     for token in doc:
-        if token.pos_ != "VERB":
+        if token.pos_ not in {"NOUN", "VERB"}:
             continue
 
-        if not is_renovation_verb(token):
-            continue
+        if token.lemma_ in STRUCTURAL_LEMMAS:
+            return 1
 
-        window = doc[max(token.i - 5, 0): min(token.i + 6, len(doc))]
-
-        for t in window:
-            if t.pos_ == "NOUN":
-                room = is_room_noun(t)
-                if room:
-                    if room in {"living", "lounge"}:
-                        found.add("living room")
-                    else:
-                        found.add(room)
-
-    # pass 2: implicit adjective based renovation with quality cue
-    if not found:
-        for token in doc:
-            if not is_renovation_adjective(token):
-                continue
-
-            window = doc[max(token.i - 5, 0): min(token.i + 6, len(doc))]
-
-            has_quality = any(is_quality_cue(t) for t in window)
-            if not has_quality:
-                continue
-
-            window_tokens = [t.lemma_ for t in window]
-
-            if "kitchen" in window_tokens:
-                found.add("kitchen")
-            if "bathroom" in window_tokens:
-                found.add("bathroom")
-            if "bedroom" in window_tokens:
-                found.add("bedroom")
-            if "living" in window_tokens or "lounge" in window_tokens:
-                found.add("living room")
-
-
-    if found:
-        return list(found)
-
-    return np.nan
-
-
-
-def extract_structural_changes(text):
-    # rule based first
-    rule_keywords = [
-        'extension', 'extended', 'loft conversion',
-        'structural alteration', 'planning permission'
-    ]
-    if any(k in text for k in rule_keywords):
-        return 1
-
-    # embedding based fallback
-    return embedding_structural_detector(text)
-
+    return 0
 
 def extract_renovation_type(text):
     text = str(text).lower()
@@ -268,8 +217,6 @@ df_extracted[
         "type_of_renovation"
     ]
 ].head(10)
-
-
 
 
 df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms.csv", index=False)
