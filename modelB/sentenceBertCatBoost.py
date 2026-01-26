@@ -5,15 +5,16 @@ import spacy
 
 df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
 
+# add unique id per row
+df_real.insert(0, "id", range(1, len(df_real) + 1))
+
 
 nlp = spacy.load("en_core_web_md")
 
 STRUCTURAL_LEMMAS = {
     "extend",
-    "extension",
     "convert",
     "conversion",
-    "loft",
     "alter",
     "alteration",
     "structural"
@@ -100,6 +101,49 @@ def is_room_noun(token, threshold=0.65):
             return r.text
     return None
 
+def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2): 
+    rooms = set() 
+    start = max(stuct_change_indicator.i - window_size, 0) 
+    end = min(stuct_change_indicator.i + window_size + 1, len(doc))
+    window = doc[start:end] 
+    found_noun = False
+    # for t in window:
+    #     if t.pos_ == "NOUN": 
+    #         lemma = t.lemma_ 
+    #         if lemma in ROOM_NOUNS: 
+    #             rooms.add(lemma) 
+    #         else:
+    #             rooms.add("other/custom")
+    
+    # return list(rooms)
+    for t in window:
+        if t.pos_ == "NOUN":
+            found_noun = True
+            if t.lemma_ in ROOM_NOUNS:
+                rooms.add(t.lemma_)
+            else:
+                rooms.add("other/custom")
+
+    if not found_noun:
+        rooms.add("other/custom")
+
+    return list(rooms)
+
+
+def is_actual_structural_event(token):
+    # Case 1: past participle used adjectivally
+    # "extended kitchen", "converted barn"
+    if token.pos_ == "ADJ" and token.dep_ == "amod":
+        return True
+
+    # Case 2: past tense or past participle verb
+    # "was extended", "has been converted"
+    if token.pos_ == "VERB" and token.tag_ in {"VBD", "VBN"}:
+        return True
+
+    return False
+
+
 def embedding_renovation_detector(text, window_size=30):
     text = str(text).lower()
     doc = nlp(text)
@@ -160,26 +204,71 @@ def extract_material_grade(text):
     return np.nan
 
 
-def extract_structural_changes(text):
+# def extract_structural_changes(text, row_id):
+#     text = str(text).lower()
+#     doc = nlp(text)
+
+#     for token in doc:
+
+#         # must represent an actual event, not a possibility
+#         if not is_actual_structural_event(token):
+#             continue
+
+#         #cannot compare the lemma of the token to STRUCTURAL_LEMMAS as spaCey treats 
+#         #adjectives in the past as already lemmatised
+#         if not any(token.lower_.startswith(s) for s in STRUCTURAL_LEMMAS):
+#             continue
+
+#         rooms = structural_changed_room(token, doc, row_id)
+#         return 1, rooms if rooms else []
+
+#     return 0, []
+
+def extract_structural_changes(text, row_id):
     text = str(text).lower()
     doc = nlp(text)
 
+    rooms = set()
+    found = False
+
     for token in doc:
-        if token.pos_ not in {"NOUN", "VERB"}:
+        if not is_actual_structural_event(token):
             continue
 
-        if token.lemma_ in STRUCTURAL_LEMMAS:
-            return 1
+        if not any(token.lower_.startswith(s) for s in STRUCTURAL_LEMMAS):
+            continue
 
-    return 0
+        found = True
+        detected_rooms = structural_changed_room(token, doc, row_id)
+        for r in detected_rooms:
+            rooms.add(r)
 
-def extract_renovation_type(text):
+    if found:
+        return 1, list(rooms) if rooms else ["other/custom"]
+
+    return 0, []
+
+
+
+def extract_renovation_type(text, rooms, rowid):
     text = str(text).lower()
+    renovation_rooms = set()
 
-    if "modernised throughout" in text or "fully refurbished" in text:
+    if rooms:
+        renovation_rooms.update(rooms)
+
+    if "modernised throughout" in text or "fully renovated" in text:
         return "full renovation"
 
-    return embedding_renovation_detector(text)
+    semantic_rooms = embedding_renovation_detector(text)
+    if isinstance(semantic_rooms, list):
+        renovation_rooms.update(semantic_rooms)
+
+    if renovation_rooms:
+        return list(renovation_rooms)
+
+    return np.nan
+
 
 
 
@@ -191,8 +280,31 @@ def extract_structured_features(df, description_col):
     df['num_of_bathrooms'] = text.apply(lambda t: int(re.search(r'(\d+)\s+bath', t).group(1)) if re.search(r'(\d+)\s+bath', t) else np.nan)
 
     df['material_grade'] = text.apply(extract_material_grade)
-    df['structural_changes'] = text.apply(extract_structural_changes)
-    df['type_of_renovation'] = text.apply(extract_renovation_type)
+    
+    # # APPLY structural extraction PER ROW
+    # df[['structural_changes', 'structural_rooms']] = (
+    #     text.apply(lambda t: pd.Series(extract_structural_changes(t)))
+    # )
+
+    df[['structural_changes', 'structural_rooms']] = df.apply(
+        lambda row: pd.Series(
+            extract_structural_changes(row[description_col], row['id'])
+        ),
+        axis=1
+    )
+
+    # APPLY renovation type PER ROW using rooms from same row
+    df['type_of_renovation'] = df.apply(
+        lambda row: extract_renovation_type(
+            row[description_col],
+            row['structural_rooms'],
+            row['id']
+        ),
+        axis=1
+    )
+
+    # cleanup if you do not want to keep rooms
+    df.drop(columns=['structural_rooms'], inplace=True)
 
     # Not extractable reliably
     df['sqft_renovated'] = np.nan
