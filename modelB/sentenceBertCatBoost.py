@@ -71,11 +71,23 @@ STATE_VERBS = {
     "comprise", "comprises"
 }
 
-
+MATERIAL_SEEDS = {
+    "budget-friendly": ["laminate", "vinyl", "carpet", "upvc", "acrylic", "mdf", "painted", "composite"],
+    "mid-range": ["ceramic", "porcelain", "engineered", "granite", "steel", "timber", "glazed", "stoneware"],
+    "high-end": ["hardwood", "marble", "quartz", "limestone", "slate", "aluminium", "brass", "bespoke"]
+}
 
 ROOM_NOUN_DOCS = [nlp(w) for w in ROOM_NOUNS]
+MATERIAL_SEED_DOCS = {
+    k: [nlp(w) for w in v]
+    for k, v in MATERIAL_SEEDS.items()
+}
+
+PRICE_HIGH = df_real["price"].quantile(0.75)
+PRICE_LOW = df_real["price"].quantile(0.25)
 
 
+#RENOVATION TYPE HELPERS
 def is_semantic_renovation_token(token, threshold=0.65):
     # only allow verbs and adjectives
     if token.pos_ not in {"VERB", "ADJ"}:
@@ -100,49 +112,6 @@ def is_room_noun(token, threshold=0.65):
         if token.similarity(r) >= threshold:
             return r.text
     return None
-
-def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2): 
-    rooms = set() 
-    start = max(stuct_change_indicator.i - window_size, 0) 
-    end = min(stuct_change_indicator.i + window_size + 1, len(doc))
-    window = doc[start:end] 
-    found_noun = False
-    # for t in window:
-    #     if t.pos_ == "NOUN": 
-    #         lemma = t.lemma_ 
-    #         if lemma in ROOM_NOUNS: 
-    #             rooms.add(lemma) 
-    #         else:
-    #             rooms.add("other/custom")
-    
-    # return list(rooms)
-    for t in window:
-        if t.pos_ == "NOUN":
-            found_noun = True
-            if t.lemma_ in ROOM_NOUNS:
-                rooms.add(t.lemma_)
-            else:
-                rooms.add("other/custom")
-
-    if not found_noun:
-        rooms.add("other/custom")
-
-    return list(rooms)
-
-
-def is_actual_structural_event(token):
-    # Case 1: past participle used adjectivally
-    # "extended kitchen", "converted barn"
-    if token.pos_ == "ADJ" and token.dep_ == "amod":
-        return True
-
-    # Case 2: past tense or past participle verb
-    # "was extended", "has been converted"
-    if token.pos_ == "VERB" and token.tag_ in {"VBD", "VBN"}:
-        return True
-
-    return False
-
 
 def embedding_renovation_detector(text, window_size=30):
     text = str(text).lower()
@@ -187,21 +156,92 @@ def embedding_renovation_detector(text, window_size=30):
 
     return np.nan
 
-def extract_material_grade(text):
-    high = [
-        'premium', 'luxury', 'high quality', 'top quality',
-        'sleek', 'contemporary', 'designer', 'immaculately presented'
-    ]
-    low = [
-        'dated', 'basic', 'tired', 'in need of modernisation',
-        'requires renovation'
-    ]
+#STRUCTUAL CHANGE HELPERS
 
-    if any(k in text for k in high):
-        return 'high'
-    if any(k in text for k in low):
-        return 'low'
-    return np.nan
+def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2): 
+    rooms = set() 
+    start = max(stuct_change_indicator.i - window_size, 0) 
+    end = min(stuct_change_indicator.i + window_size + 1, len(doc))
+    window = doc[start:end] 
+    found_noun = False
+    # for t in window:
+    #     if t.pos_ == "NOUN": 
+    #         lemma = t.lemma_ 
+    #         if lemma in ROOM_NOUNS: 
+    #             rooms.add(lemma) 
+    #         else:
+    #             rooms.add("other/custom")
+    
+    # return list(rooms)
+    for t in window:
+        if t.pos_ == "NOUN":
+            found_noun = True
+            if t.lemma_ in ROOM_NOUNS:
+                rooms.add(t.lemma_)
+            else:
+                rooms.add("other/custom")
+
+    if not found_noun:
+        rooms.add("other/custom")
+
+    return list(rooms)
+
+
+def is_actual_structural_event(token):
+    # Case 1: past participle used adjectivally
+    # "extended kitchen", "converted barn"
+    if token.pos_ == "ADJ" and token.dep_ == "amod":
+        return True
+
+    # Case 2: past tense or past participle verb
+    # "was extended", "has been converted"
+    if token.pos_ == "VERB" and token.tag_ in {"VBD", "VBN"}:
+        return True
+
+    return False
+
+#MATERIAL GRADE HELPER
+def price_material_signal(price):
+    if price >= PRICE_HIGH:
+        return {"high-end": 1.5, "mid-range": 0.5, "budget-friendly": 0}
+    if price <= PRICE_LOW:
+        return {"high-end": 0, "mid-range": 0.5, "budget-friendly": 1.5}
+    return {"high-end": 0.3, "mid-range": 1.0, "budget-friendly": 0.3}
+
+
+def extract_material_grade(text, price, threshold=0.75):
+    text = str(text).lower()
+    doc = nlp(text)
+
+    scores = {
+        "high-end": 0.0,
+        "mid-range": 0.0,
+        "budget-friendly": 0.0
+    }
+
+    # semantic contribution
+    for token in doc:
+        if token.pos_ not in {"ADJ", "ADV"}:
+            continue
+        else:
+            print(token.lemma_, token.pos_)
+
+        for grade, seeds in MATERIAL_SEED_DOCS.items():
+            for seed in seeds:
+                print(token.lemma_, seed, token.similarity(seed))
+                if token.similarity(seed) >= threshold:
+                    scores[grade] += 1.0
+
+    # price contribution
+    price_signal = price_material_signal(price)
+    for grade in scores:
+        scores[grade] += price_signal[grade]
+
+    # no signal at all
+    if max(scores.values()) == 0:
+        return np.nan
+
+    return max(scores, key=scores.get)
 
 
 # def extract_structural_changes(text, row_id):
@@ -274,12 +314,11 @@ def extract_renovation_type(text, rooms, rowid):
 
 def extract_structured_features(df, description_col):
     df = df.copy()
-    text = df[description_col].str.lower()
 
-    df['num_of_bedrooms'] = text.apply(lambda t: int(re.search(r'(\d+)\s+bed', t).group(1)) if re.search(r'(\d+)\s+bed', t) else np.nan)
-    df['num_of_bathrooms'] = text.apply(lambda t: int(re.search(r'(\d+)\s+bath', t).group(1)) if re.search(r'(\d+)\s+bath', t) else np.nan)
-
-    df['material_grade'] = text.apply(extract_material_grade)
+    df['material_grade'] = df.apply(
+        lambda row: extract_material_grade(row[description_col], row["price"]),
+        axis=1
+    )
     
     # # APPLY structural extraction PER ROW
     # df[['structural_changes', 'structural_rooms']] = (
@@ -309,7 +348,6 @@ def extract_structured_features(df, description_col):
     # Not extractable reliably
     df['sqft_renovated'] = np.nan
     df['sqft_to_add'] = np.nan
-    df['property_size'] = np.nan
 
     return df
 
@@ -326,7 +364,8 @@ df_extracted[
         "num_of_bathrooms",
         "material_grade",
         "structural_changes",
-        "type_of_renovation"
+        "type_of_renovation",
+        "property_size"
     ]
 ].head(10)
 
