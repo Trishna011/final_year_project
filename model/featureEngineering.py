@@ -18,8 +18,6 @@ import os
 
 # #load the dataset from hugging face
 # dataset = load_dataset("Trish101/property-dataset", split="train")
-# #load the dataset from hugging face
-# dataset = load_dataset("Trish101/property-dataset", split="train")
 # df = dataset.to_pandas()
 # #get rid of duplicate rows
 # df = df.drop_duplicates()
@@ -371,8 +369,13 @@ def add_labour_rate(data):
 
 def expand_records(data):
     renovation_types = data.get("renovation_type", [])
-    bedrooms = data.get("bedrooms_to_reno", 0)
-    bathrooms = data.get("bathrooms_to_reno", 0)
+    
+    bedrooms_raw = data.get("bedrooms_to_reno")
+    bathrooms_raw = data.get("bathrooms_to_reno")
+
+    bedrooms = bedrooms_raw if isinstance(bedrooms_raw, int) else 0
+    bathrooms = bathrooms_raw if isinstance(bathrooms_raw, int) else 0
+
 
     sqft_add = data.get("sqft_to_add", {})
     sqft_reno = data.get("sqft_renovated", {})
@@ -411,10 +414,10 @@ def expand_records(data):
         output.append({
             **base_shared,
             "renovation_type": "Bedroom",
-            "sqft_to_add_to_property": sqft_add.get("bedrooms",[0])[i],
-            "sqft_renovated": sqft_reno.get("bedrooms",[0])[i],
+            "sqft_to_add_to_property": sqft_add.get("bedrooms", [0]*bedrooms)[i] if i < len(sqft_add.get("bedrooms", [])) else 0,
+            "sqft_renovated": sqft_reno.get("bedrooms", [0]*bedrooms)[i] if i < len(sqft_reno.get("bedrooms", [])) else 0,
             "material_grade": material["bedrooms"][i] if i < len(material["bedrooms"]) else "",
-            "structural_changes": struct["bedrooms"][i],
+            "structural_changes": struct["bedrooms"][i] if i < len(struct["bedrooms"]) else "",
         })
 
     # ---------- Bathrooms ----------
@@ -422,11 +425,12 @@ def expand_records(data):
         output.append({
             **base_shared,
             "renovation_type": "Bathroom",
-            "sqft_to_add_to_property": sqft_add.get("bathrooms",[0])[i],
-            "sqft_renovated": sqft_reno.get("bathrooms",[0])[i],
+            "sqft_to_add_to_property": sqft_add.get("bathrooms", [0]*bathrooms)[i] if i < len(sqft_add.get("bathrooms", [])) else 0,
+            "sqft_renovated": sqft_reno.get("bathrooms", [0]*bathrooms)[i] if i < len(sqft_reno.get("bathrooms", [])) else 0,
             "material_grade": material["bathrooms"][i] if i < len(material["bathrooms"]) else "",
-            "structural_changes": struct["bathrooms"][i],
+            "structural_changes": struct["bathrooms"][i] if i < len(struct["bathrooms"]) else "",
         })
+
 
     # ---------- Other room types ----------
     other_rooms = [t for t in renovation_types if t not in ["Bedroom","Bathroom"]]
