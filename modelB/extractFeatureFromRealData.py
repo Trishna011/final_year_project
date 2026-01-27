@@ -223,12 +223,8 @@ def extract_material_grade(text, price, threshold=0.75):
     for token in doc:
         if token.pos_ not in {"ADJ", "ADV"}:
             continue
-        else:
-            print(token.lemma_, token.pos_)
-
         for grade, seeds in MATERIAL_SEED_DOCS.items():
             for seed in seeds:
-                print(token.lemma_, seed, token.similarity(seed))
                 if token.similarity(seed) >= threshold:
                     scores[grade] += 1.0
 
@@ -303,6 +299,9 @@ def extract_renovation_type(text, rooms, rowid):
     semantic_rooms = embedding_renovation_detector(text)
     if isinstance(semantic_rooms, list):
         renovation_rooms.update(semantic_rooms)
+
+    if len(renovation_rooms) >= 4:
+        return "full renovation"
 
     if renovation_rooms:
         return list(renovation_rooms)
