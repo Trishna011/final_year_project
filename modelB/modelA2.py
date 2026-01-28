@@ -7,14 +7,19 @@ from catboost import CatBoostRegressor
 from itertools import product
 import json
 
+def mean_absolute_percentage_error(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true))
+
 train_df = pd.read_csv("processed_data/real_with_extracted_features_synonyms.csv")
-val_df = pd.read_csv("processed_data/real_val_preprocessed.csv")
+val_df = pd.read_csv("processed_data/real_val_with_extracted_features_synonyms.csv")
 
 #remove duplicates
 train_df = train_df.drop_duplicates().reset_index(drop=True)
 val_df = val_df.drop_duplicates().reset_index(drop=True)
 
-#spot outliers
+#spot outliers for price and remove them
 Q1 = train_df["price"].quantile(0.25)
 Q3 = train_df["price"].quantile(0.75)
 IQR = Q3 - Q1
@@ -28,36 +33,40 @@ train_df = train_df[
 ].reset_index(drop=True)
 
 #ordinally encode material grade
-if "material_grade" not in val_df.columns:
-    val_df["material_grade"] = np.nan
-
 material_mapping = {
     "budget-friendly": 0,
     "mid-range": 1,
     "high-end": 2
 }
 
+# ensure column exists in both
+for df in [train_df, val_df]:
+    if "material_grade" not in df.columns:
+        df["material_grade"] = np.nan
+
+# apply the same ordinal mapping to both
 train_df["material_grade"] = train_df["material_grade"].map(material_mapping)
 val_df["material_grade"] = val_df["material_grade"].map(material_mapping)
 
 
+
 #label encode structural changes
-if "structural_changes" in train_df.columns:
-    le_structural = LabelEncoder()
+# ensure column exists in both datasets
+for df in [train_df, val_df]:
+    if "structural_changes" not in df.columns:
+        df["structural_changes"] = np.nan
 
-    train_df["structural_changes"] = le_structural.fit_transform(
-        train_df["structural_changes"].astype(str)
-    )
+# fit encoder on training data only
+le_structural = LabelEncoder()
 
-    if "structural_changes" in val_df.columns:
-        val_df["structural_changes"] = le_structural.transform(
-            val_df["structural_changes"].astype(str)
-        )
-    else:
-        val_df["structural_changes"] = np.nan
-else:
-    raise ValueError("structural_changes missing from training data")
+train_df["structural_changes"] = le_structural.fit_transform(
+    train_df["structural_changes"].astype(str)
+)
 
+# apply same encoding to validation
+val_df["structural_changes"] = le_structural.transform(
+    val_df["structural_changes"].astype(str)
+)
 
 #one hot encode reno type
 # one hot encode renovation type on train
@@ -71,25 +80,30 @@ else:
     raise ValueError("type_of_renovation missing from training data")
 
 # one hot encode renovation type on validation only if present
-if "type_of_renovation" in val_df.columns:
-    val_df = pd.get_dummies(
-        val_df,
-        columns=["type_of_renovation"],
-        dummy_na=True
-    )
-else:
-    # create a dummy NaN column so alignment works
-    val_df["type_of_renovation_nan"] = 1
+# ensure column exists in both datasets
+for df in [train_df, val_df]:
+    if "type_of_renovation" not in df.columns:
+        df["type_of_renovation"] = np.nan
 
-train_df, val_df = train_df.align(
-    val_df,
-    join="left",
-    axis=1,
-    fill_value=0
+# one hot encode BOTH together to guarantee identical columns
+combined = pd.concat(
+    [train_df, val_df],
+    axis=0,
+    ignore_index=True
 )
 
+combined = pd.get_dummies(
+    combined,
+    columns=["type_of_renovation"],
+    dummy_na=True
+)
 
-#robust scale
+# split back into train and validation
+train_df = combined.iloc[:len(train_df)].reset_index(drop=True)
+val_df = combined.iloc[len(train_df):].reset_index(drop=True)
+
+
+#apply trained catboot to validation set
 target_col = "price"
 
 exclude_cols = [
@@ -101,6 +115,14 @@ feature_cols = [
     c for c in train_df.columns
     if c not in exclude_cols
 ]
+
+#remove very high or very small property sizes
+lower = train_df["property_size"].quantile(0.01)
+upper = train_df["property_size"].quantile(0.99)
+
+for df in [train_df, val_df]:
+    df["property_size"] = df["property_size"].clip(lower, upper)
+
 
 X_train = train_df[feature_cols].values
 y_train = np.log1p(train_df["price"].values)
@@ -130,7 +152,8 @@ for depth, lr, l2 in product(
         depth=depth,
         learning_rate=lr,
         l2_leaf_reg=l2,
-        loss_function="RMSE",
+        #changed loss function from RMSE to MAE to improve MAPE
+        loss_function="MAE",
         random_seed=42,
         early_stopping_rounds=100,
         verbose=False
@@ -195,7 +218,19 @@ print("learning_rate:", best_params[1])
 print("l2_leaf_reg:", best_params[2])
 print("Best R^2:", best_r2)
 
-val_preds = best_model.predict(X_val)
-final_r2 = r2_score(y_val_log, val_preds)
+# predict log price on validation
+val_preds_log = best_model.predict(X_val)
+
+# convert back to original price scale
+val_preds_price = np.expm1(val_preds_log)
+y_val_price = val_df["price"].values
+
+# R^2 on log price (already correct)
+final_r2 = r2_score(y_val_log, val_preds_log)
+
+# MAPE on original price
+mape = mean_absolute_percentage_error(y_val_price, val_preds_price)
 
 print("Final A2 R^2 (log price):", final_r2)
+print("Final A2 MAPE:", mape)
+print("Final A2 MAPE (%):", mape * 100)
