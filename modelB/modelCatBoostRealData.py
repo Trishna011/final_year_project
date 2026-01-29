@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+import ast
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import r2_score
 from catboost import CatBoostRegressor
@@ -69,39 +69,60 @@ val_df["structural_changes"] = le_structural.transform(
 )
 
 #one hot encode reno type
-# one hot encode renovation type on train
-if "type_of_renovation" in train_df.columns:
-    train_df = pd.get_dummies(
-        train_df,
-        columns=["type_of_renovation"],
-        dummy_na=True
-    )
-else:
-    raise ValueError("type_of_renovation missing from training data")
+# ensure column exists
+for df_ in [train_df, val_df]:
+    if "type_of_renovation" not in df_.columns:
+        df_["type_of_renovation"] = ""
 
-# one hot encode renovation type on validation only if present
-# ensure column exists in both datasets
-for df in [train_df, val_df]:
-    if "type_of_renovation" not in df.columns:
-        df["type_of_renovation"] = np.nan
+def normalize_token(x):
+    return " ".join(x.lower().strip().split())
 
-# one hot encode BOTH together to guarantee identical columns
-combined = pd.concat(
-    [train_df, val_df],
-    axis=0,
-    ignore_index=True
-)
+def parse_reno(value):
+    if pd.isna(value):
+        return []
 
-combined = pd.get_dummies(
-    combined,
-    columns=["type_of_renovation"],
-    dummy_na=True
-)
+    value = str(value)
 
-# split back into train and validation
-train_df = combined.iloc[:len(train_df)].reset_index(drop=True)
-val_df = combined.iloc[len(train_df):].reset_index(drop=True)
+    if value.startswith("[") and value.endswith("]"):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return [normalize_token(v) for v in parsed if isinstance(v, str)]
+        except Exception:
+            return []
 
+    return [normalize_token(value)]
+train_df["type_of_renovation_parsed"] = train_df["type_of_renovation"].apply(parse_reno)
+val_df["type_of_renovation_parsed"] = val_df["type_of_renovation"].apply(parse_reno)
+
+# fixed schema
+fixed_types = {
+    "bathroom": "bathroom",
+    "bedroom": "bedroom",
+    "kitchen": "kitchen",
+    "living room": "living_room",
+    "other/custom": "other_custom",
+    "full renovation": "full_renovation"
+}
+
+for key, suffix in fixed_types.items():
+    col = f"reno_{suffix}"
+    train_df[col] = train_df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
+    val_df[col] = val_df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
+
+# drop source columns
+train_df = train_df.drop(columns=["type_of_renovation", "type_of_renovation_parsed"])
+val_df = val_df.drop(columns=["type_of_renovation", "type_of_renovation_parsed"])
+
+# align columns
+train_df, val_df = train_df.align(val_df, join="left", axis=1, fill_value=0)
+
+#see the real features
+train_processed_path = "processed_data/real_features.csv"
+
+if "id" in train_df.columns:
+    train_df = train_df.drop(columns=["id"])
+train_df.to_csv(train_processed_path, index=False)
 
 #apply trained catboot to validation set
 target_col = "price"
@@ -111,9 +132,15 @@ exclude_cols = [
     "description"
 ]
 
+DROP_FEATURES = [
+    "id",
+    "num_of_bedrooms",
+    "num_of_bathrooms"
+]
+
 feature_cols = [
     c for c in train_df.columns
-    if c not in exclude_cols
+    if c not in exclude_cols and c not in DROP_FEATURES
 ]
 
 #remove very high or very small property sizes
@@ -182,7 +209,7 @@ for depth, lr, l2 in product(
         best_params = (depth, lr, l2)
 
 #save the model
-model_path = "modelB/models/A2_catboost_model.cbm"
+model_path = "modelB/models/real_catboost_model.cbm"
 best_model.save_model(model_path)
 
 print(f"Model saved")
@@ -193,7 +220,7 @@ best_params_dict = {
 }
 
 #save hyperparams
-params_path = "modelB/models/A2_catboost_params.json"
+params_path = "modelB/models/real_catboost_params.json"
 
 with open(params_path, "w") as f:
     json.dump(best_params_dict, f, indent=4)
@@ -201,7 +228,7 @@ with open(params_path, "w") as f:
 print(f"Parameters saved")
 
 #save feature column order
-feature_cols_path = "modelB/models/A2_feature_columns.json"
+feature_cols_path = "modelB/models/real_feature_columns.json"
 
 with open(feature_cols_path, "w") as f:
     json.dump(feature_cols, f, indent=4)
