@@ -5,7 +5,12 @@ from sentence_transformers import SentenceTransformer
 from catboost import CatBoostRegressor
 from sklearn.metrics import r2_score
 
-real_train_df = pd.read_csv("processed_data/real_with_extracted_features_synonyms.csv")
+def mean_absolute_percentage_error(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true))
+
+real_train_df = pd.read_csv("processed_data/real_train_preprocessed.csv")
 real_val_preprocessed = pd.read_csv("processed_data/real_val_preprocessed.csv")
 
 
@@ -51,7 +56,17 @@ y_val_log = np.log1p(real_val_preprocessed["price"].values)
 
 val_preds_log = model.predict(X_val)
 
+# convert predictions back to original price scale
+val_preds_price = np.expm1(val_preds_log)
+y_val_price = real_val_preprocessed["price"].values
+
+mape = mean_absolute_percentage_error(y_val_price, val_preds_price)
+
+
 r2 = r2_score(y_val_log, val_preds_log)
 
 print("R^2 (log price):", r2)
+print("MAPE:", mape)
+print("MAPE (%):", mape * 100)
+
 

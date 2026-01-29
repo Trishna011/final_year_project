@@ -56,10 +56,6 @@ def extract_sqft(value):
             return np.nan
     return np.nan
 
-# convert sqft columns into numeric totals
-df["sqft_renovated_num"] = df["sqft_renovated"].apply(extract_sqft)
-df["sqft_to_add_num"] = df["sqft_to_add"].apply(extract_sqft)
-
 # remove logically invalid and economically impossible rows
 df = df[
     (df["property_size"] > 0) &
@@ -76,8 +72,6 @@ iqr_cols = [
     "renovation_cost",
     "pre_renovation_cost",
     "property_size",
-    "sqft_renovated_num",
-    "sqft_to_add_num"
 ]
 
 cols_with_outliers = []
@@ -121,13 +115,13 @@ df = df[
 plt.figure(figsize=(12, 6))
 sns.boxplot(data=df[cols_with_outliers])
 plt.xticks(rotation=45)
-plt.show()
+#plt.show()
 
 # ordinal encode material_grade
 grade_map = {
-    "budgetfriendly": 3,
-    "midrange": 2,
-    "highend": 1
+    "budgetfriendly": 0,
+    "midrange": 1,
+    "highend": 2
 }
 
 def normalize_grade(text):
@@ -244,19 +238,8 @@ train_df, val_df = train_test_split(
 print("Training rows:", train_df.shape)
 print("Validation rows:", val_df.shape)
 
-num_cols = [    
-    "renovation_cost",
-    "pre_renovation_cost",
-    "property_size",
-    "sqft_renovated_num",
-    "sqft_to_add_num"
-]
 
-scaler = RobustScaler()
-
-train_df[num_cols] = scaler.fit_transform(train_df[num_cols])
-val_df[num_cols] = scaler.transform(val_df[num_cols])
-
+#label encode struct changes
 struct_map = {
     "Yes": 1,
     "No": 0
@@ -269,7 +252,7 @@ def encode_structural_changes_lists(value):
     if isinstance(value, str):
         try:
             value = ast.literal_eval(value)
-        except:
+        except Exception:
             return []
 
     if not isinstance(value, list):
@@ -281,12 +264,31 @@ def encode_structural_changes_lists(value):
 train_df["structural_changes"] = train_df["structural_changes"].apply(encode_structural_changes_lists)
 val_df["structural_changes"] = val_df["structural_changes"].apply(encode_structural_changes_lists)
 
-# frequency encode location
-location_freq = train_df["location"].value_counts(normalize=True)
+#target encode location
+target_col = "post_renovation_value"
 
-# map to train and validation
-train_df["location"] = train_df["location"].map(location_freq)
-val_df["location"] = val_df["location"].map(location_freq).fillna(0)
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+train_df["location"] = 0.0
+global_mean = train_df[target_col].mean()
+
+for train_idx, val_idx in kf.split(train_df):
+    fold_train = train_df.iloc[train_idx]
+    fold_val = train_df.iloc[val_idx]
+
+    location_means = fold_train.groupby("location")[target_col].mean()
+
+    train_df.loc[fold_val.index, "location"] = (
+        fold_val["location"].map(location_means).fillna(global_mean)
+    )
+
+# fit final mapping on full training set
+location_means_full = train_df.groupby("location")[target_col].mean()
+
+val_df["location"] = (
+    val_df["location"].map(location_means_full).fillna(global_mean)
+)
+
 
 
 def encode_material_grade_lists(value):
@@ -349,6 +351,8 @@ for t in fixed_types:
 
 train_df, val_df = train_df.align(val_df, join="left", axis=1, fill_value=0)
 
+train_df = train_df.drop(columns=["renovation_type"])
+val_df = val_df.drop(columns=["renovation_type"])
 
 
 # create output folders
@@ -377,26 +381,22 @@ val_df.to_csv(val_path, index=False)
 print("Saved train data to:", train_path)
 print("Saved validation data to:", val_path)
 
-# save scaler
-scaler_path = os.path.join("preprocessing_artifacts", "robust_scaler.joblib")
-joblib.dump(scaler, scaler_path)
+# # # save location frequency encoding
+# # location_freq_path = os.path.join("preprocessing_artifacts", "location_frequency.json")
+# # with open(location_freq_path, "w", encoding="utf-8") as f:
+# #     json.dump(location_freq.to_dict(), f, ensure_ascii=False, indent=2)
 
-# save location frequency encoding
-location_freq_path = os.path.join("preprocessing_artifacts", "location_frequency.json")
-with open(location_freq_path, "w", encoding="utf-8") as f:
-    json.dump(location_freq.to_dict(), f, ensure_ascii=False, indent=2)
+# # save renovation type schema
+# schema_path = os.path.join("preprocessing_artifacts", "renovation_type_schema.json")
+# with open(schema_path, "w", encoding="utf-8") as f:
+#     json.dump(
+#         {
+#             "fixed_types": fixed_types,
+#             "numeric_scaled_columns": num_cols
+#         },
+#         f,
+#         ensure_ascii=False,
+#         indent=2
+#     )
 
-# save renovation type schema
-schema_path = os.path.join("preprocessing_artifacts", "renovation_type_schema.json")
-with open(schema_path, "w", encoding="utf-8") as f:
-    json.dump(
-        {
-            "fixed_types": fixed_types,
-            "numeric_scaled_columns": num_cols
-        },
-        f,
-        ensure_ascii=False,
-        indent=2
-    )
-
-print("Saved preprocessing artifacts")
+# print("Saved preprocessing artifacts")
