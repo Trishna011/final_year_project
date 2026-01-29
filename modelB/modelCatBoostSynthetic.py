@@ -72,7 +72,7 @@ for src_idx, r in df.iterrows():
             })
             struct_idx += 1
     
-    # other spaces: kitchen, living room, custom
+    # other spaces: kitchen, living room, custom, full reno
     for k, sqft in sqft_ren.get("other", {}).items():
         k_lower = k.lower()
 
@@ -87,39 +87,46 @@ for src_idx, r in df.iterrows():
             "reno_bathroom": 0,
             "reno_bedroom": 0,
             "reno_kitchen": int(k_lower == "kitchen"),
-            "reno_living_room": int(k_lower == "livingroom"),
-            "reno_other_custom": int(k_lower not in ["kitchen", "livingroom"]),
-            "reno_full_renovation": 0
+            "reno_living_room": int(k_lower == "living room"),
+            "reno_other_custom": int(k_lower not in ["kitchen", "living room", "full renovation"]),
+            "reno_full_renovation": int(k_lower == "full renovation"),
         })
         struct_idx += 1
     
-    if r["reno_full_renovation"] == 1:
-        output_rows.append({
-            **base,
-            "unit_type": "full_renovation",
-            "unit_index": 1,
-            "sqft_renovated": (
-                sum(sqft_ren.get("bedrooms", [])) +
-                sum(sqft_ren.get("bathrooms", [])) +
-                sum(sqft_ren.get("other", {}).values())
-            ),
-            "sqft_to_add": (
-                sum(sqft_add.get("bedrooms", [])) +
-                sum(sqft_add.get("bathrooms", [])) +
-                sum(sqft_add.get("other", {}).values())
-            ),
-            "material_grade": None,
-            "structural_change": max(struct),
-            "reno_bathroom": 0,
-            "reno_bedroom": 0,
-            "reno_kitchen": 0,
-            "reno_living_room": 0,
-            "reno_other_custom": 0,
-            "reno_full_renovation": 1
-        })
+    # if r["reno_full_renovation"] == 1:
+    #     output_rows.append({
+    #         **base,
+    #         "unit_type": "full_renovation",
+    #         "unit_index": 1,
+    #         "sqft_renovated": (
+    #             sum(sqft_ren.get("bedrooms", [])) +
+    #             sum(sqft_ren.get("bathrooms", [])) +
+    #             sum(sqft_ren.get("other", {}).values())
+    #         ),
+    #         "sqft_to_add": (
+    #             sum(sqft_add.get("bedrooms", [])) +
+    #             sum(sqft_add.get("bathrooms", [])) +
+    #             sum(sqft_add.get("other", {}).values())
+    #         ),
+    #         "material_grade": None,
+    #         "structural_change": max(struct),
+    #         "reno_bathroom": 0,
+    #         "reno_bedroom": 0,
+    #         "reno_kitchen": 0,
+    #         "reno_living_room": 0,
+    #         "reno_other_custom": 0,
+    #         "reno_full_renovation": 1
+    #     })
 
 expanded_df = pd.DataFrame(output_rows)
 
+expanded_df = expanded_df.drop(
+    columns=[
+        "unit_type",
+        "unit_index"
+    ],
+    errors="ignore"
+)
 
 output_path = "processed_data/synthetic_train_expanded.csv"
 
