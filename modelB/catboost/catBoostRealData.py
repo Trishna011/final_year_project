@@ -252,6 +252,20 @@ val_preds_log = best_model.predict(X_val)
 val_preds_price = np.expm1(val_preds_log)
 y_val_price = val_df["price"].values
 
+# save predictions for Wilcoxon test (real data, CatBoost)
+catboost_preds_path = "modelB/catBoost/catboost_real_preds.csv"
+
+pred_df = pd.DataFrame({
+    "id": val_df.index,
+    "y_true": y_val_price,
+    "y_pred": val_preds_price
+})
+
+pred_df.to_csv(catboost_preds_path, index=False)
+
+print(f"Saved CatBoost real predictions to {catboost_preds_path}")
+
+
 # R^2 on log price (already correct)
 final_r2 = r2_score(y_val_log, val_preds_log)
 

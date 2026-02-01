@@ -157,6 +157,21 @@ feature_cols_path = "modelB/models/synthetic_feature_columns.json"
 with open(feature_cols_path, "w") as f:
     json.dump(features, f, indent=2)
 
+
+# save predictions for Wilcoxon test (synthetic data, CatBoost)
+catboost_preds_path = "modelB/catBoost/catboost_synthetic_preds.csv"
+
+pred_df = pd.DataFrame({
+    "source_row": prop_level["y_true"].index,
+    "y_true": prop_level["y_true"].values,
+    "y_pred": prop_level["y_pred"].values
+})
+
+pred_df.to_csv(catboost_preds_path, index=False)
+
+print(f"Saved CatBoost synthetic predictions to {catboost_preds_path}")
+
+
 # # save best model
 # model_path = "modelB/models/synthetic_catboost_best_model.cbm"
 # best_model.save_model(model_path)

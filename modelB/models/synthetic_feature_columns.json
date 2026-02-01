@@ -1,0 +1,16 @@
+[
+  "property_size",
+  "location",
+  "renovation_cost",
+  "sqft_renovated",
+  "sqft_to_add",
+  "material_grade",
+  "structural_change",
+  "unit_type",
+  "reno_bathroom",
+  "reno_bedroom",
+  "reno_kitchen",
+  "reno_living_room",
+  "reno_other_custom",
+  "reno_full_renovation"
+]

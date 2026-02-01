@@ -10,8 +10,6 @@
   "numeric_scaled_columns": [
     "renovation_cost",
     "pre_renovation_cost",
-    "property_size",
-    "sqft_renovated_num",
-    "sqft_to_add_num"
+    "property_size"
   ]
 }
