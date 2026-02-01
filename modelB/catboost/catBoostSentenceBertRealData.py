@@ -60,6 +60,23 @@ val_preds_log = model.predict(X_val)
 val_preds_price = np.expm1(val_preds_log)
 y_val_price = real_val_preprocessed["price"].values
 
+# =========================
+# SAVE PREDICTIONS FOR EVALUATION
+# =========================
+
+preds_path = "modelB/catBoost/sbert_catboost_real_preds.csv"
+
+pred_df = pd.DataFrame({
+    "id": real_val_preprocessed.index,
+    "y_true": y_val_price,
+    "y_pred": val_preds_price
+})
+
+pred_df.to_csv(preds_path, index=False)
+
+print(f"Saved Sentence-BERT CatBoost predictions to {preds_path}")
+
+
 mape = mean_absolute_percentage_error(y_val_price, val_preds_price)
 
 

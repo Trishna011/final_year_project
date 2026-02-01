@@ -94,6 +94,7 @@ results = []
 # • The synthetic model decides the price most of the time.
 # • The real model only intervenes when the synthetic price looks unrealistic.
 # • The real model never fully replaces the synthetic model.
+# mimicing human in the loop systems 
 lower = 0.6 * df_syn["pred_price_real_model"]
 upper = 1.5 * df_syn["pred_price_real_model"]
 
