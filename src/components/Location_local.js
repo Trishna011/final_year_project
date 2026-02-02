@@ -32,21 +32,37 @@ export default function Location({ onBack, onNext, answers }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Prediction failed");
 
+      const renovationCost = data.total_predicted_cost;
+
+      //send all inputs and cost to server to find projected val of property post renovation
+      const valueRes = await fetch("http://localhost:4000/api/value", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...updatedAnswers,
+          renovation_cost: renovationCost,
+        }),
+      });
+
+      const valueData = await valueRes.json();
+      if (!valueRes.ok) throw new Error("Value prediction failed");
+      console.log("post_renovation_value:", valueData.post_renovation_value);
       // ✅ Step 3: Pass both updated answers + cost to parent
       onNext({
         ...updatedAnswers,
-        cost: data.total_predicted_cost
+        cost: data.total_predicted_cost,
+        postRenovationValue: valueData.post_renovation_value,
       });
     } catch (err) {
       onNext({
         ...updatedAnswers,
         cost: 0,
+        postRenovationValue: 0,
       });
     } finally {
       
     }
   };
-
 
 
   // ✅ Step 5: Normal form UI

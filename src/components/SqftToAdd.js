@@ -8,6 +8,7 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
   const renovationTypes = answers?.renovation_type ?? [];
   const bedroomCount = answers?.bedrooms_to_reno ?? 0;
   const bathroomCount = answers?.bathrooms_to_reno ?? 0;
+  const isFullReno = renovationTypes.includes("Full renovation");
 
   // Build grouped input lists
   const initialValues = {
@@ -21,6 +22,21 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
   const [values, setValues] = useState(initialValues);
 
   const handleUpdate = (group, indexOrKey, val) => {
+    // ✅ If Full renovation exists in other, only allow updating it
+    if (group === "other" && indexOrKey === "Full renovation") {
+      setValues(prev => ({
+        ...prev,
+        other: { "Full renovation": val }
+      }));
+      return;
+    }
+
+    // 🚫 Block all other updates if Full renovation is selected
+    if (values.other?.["Full renovation"] !== undefined) {
+      return;
+    }
+
+    // ✅ Normal behaviour
     if (group === "other") {
       setValues(prev => ({
         ...prev,
@@ -33,10 +49,13 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     }
   };
 
-  const allFilled =
-    values.bedrooms.every(v => v !== "") &&
+
+  const allFilled = values.other?.["Full renovation"] !== undefined
+  ? values.other["Full renovation"] !== ""
+  : values.bedrooms.every(v => v !== "") &&
     values.bathrooms.every(v => v !== "") &&
     Object.values(values.other).every(v => v !== "");
+
 
   const handleNext = () => {
     onNext({
@@ -84,7 +103,7 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     }}
   >
     {/* Bedroom Cards */}
-    {values.bedrooms.map((v, i) => (
+    {!isFullReno && values.bedrooms.map((v, i) => (
       <Box
         key={`bed-${i}`}
         p={6}
@@ -121,7 +140,7 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     ))}
 
     {/* Bathroom Cards */}
-    {values.bathrooms.map((v, i) => (
+    {!isFullReno && values.bathrooms.map((v, i) => (
       <Box key={`bath-${i}`} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
         <Text fontWeight="medium" fontSize="md" color="black" >Bathroom {i+1}</Text>
         <Input placeholder="Enter sqft to add (0 if none)" rounded="full" textAlign="center"
@@ -146,7 +165,12 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     ))}
 
     {/* Other rooms */}
-    {Object.keys(values.other).map((room) => (
+    {Object.keys(values.other)
+    .filter(room =>
+      room === "Full renovation" ||
+      !values.other["Full renovation"]
+    )
+    .map((room) => (
       <Box key={room} p={6} rounded="2xl" border="1px solid" borderColor="gray.300" shadow="md" w="100%" textAlign="left">
         <Text fontWeight="medium" fontSize="md" color="black">{room}</Text>
         <Input placeholder="Enter sqft to add (0 if none)" rounded="full" textAlign="center"

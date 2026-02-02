@@ -14,19 +14,25 @@ export default function BedBathCount({ onNext, onBack, selected }) {
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
 
+  const isFullReno = selected.includes("Full renovation");
+
   const handleContinue = () => {
     const data = {};
 
-    if (selected.includes("Bedroom")) data.bedrooms_to_reno = bedrooms;
-    if (selected.includes("Bathroom")) data.bathrooms_to_reno = bathrooms;
+    if (selected.includes("Bedroom") || isFullReno) {
+      data.bedrooms_to_reno = bedrooms;
+    }
+
+    if (selected.includes("Bathroom") || isFullReno) {
+      data.bathrooms_to_reno = bathrooms;
+    }
 
     onNext(data);
   };
 
-  // 🔥 User must enter 1+ in each selected category
   const canContinue =
-    (!selected.includes("Bedroom") || bedrooms >= 1) &&
-    (!selected.includes("Bathroom") || bathrooms >= 1);
+    ((!selected.includes("Bedroom") && !isFullReno) || bedrooms >= 1) &&
+    ((!selected.includes("Bathroom") && !isFullReno) || bathrooms >= 1);
 
   return (
     <MotionBox
@@ -46,70 +52,45 @@ export default function BedBathCount({ onNext, onBack, selected }) {
       <Heading mb={8}>How many rooms?</Heading>
 
       <VStack spacing={6}>
-        {selected.includes("Bedroom") && (
+        {(selected.includes("Bedroom") || isFullReno) && (
           <Box>
-            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>Bedrooms to Renovate</Heading>
+            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>
+              Bedrooms to Renovate
+            </Heading>
             <Input
               type="number"
               min={1}
               value={bedrooms}
-              onChange={(e)=> setBedrooms(Number(e.target.value))}
+              onChange={(e) => setBedrooms(Number(e.target.value))}
               width="150px"
               textAlign="center"
               rounded="full"
               borderWidth="1px"
               borderColor="teal.500"
-              _hover={{ borderColor: "teal.500" }}
-              _focus={{
-                borderColor: "teal.500",
-                boxShadow: "none",      // removes thick halo/glow
-                outline: "none"         // removes browser highlighting fallback
-              }}
-
-              _focusVisible={{
-                borderColor: "teal.500",
-                boxShadow: "none",
-                outline: "none"
-              }}
-
-              transition="all .2s"
             />
           </Box>
         )}
 
-        {selected.includes("Bathroom") && (
+        {(selected.includes("Bathroom") || isFullReno) && (
           <Box>
-            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>Bathrooms to Renovate</Heading>
+            <Heading fontWeight="medium" fontSize="md" color="black" mb={1}>
+              Bathrooms to Renovate
+            </Heading>
             <Input
               type="number"
               min={1}
               value={bathrooms}
-              onChange={(e)=> setBathrooms(Number(e.target.value))}
+              onChange={(e) => setBathrooms(Number(e.target.value))}
               width="150px"
               textAlign="center"
               rounded="full"
               borderWidth="1px"
               borderColor="teal.500"
-              _hover={{ borderColor: "teal.500" }}
-              _focus={{
-                borderColor: "teal.500",
-                boxShadow: "none",      // removes thick halo/glow
-                outline: "none"         // removes browser highlighting fallback
-              }}
-
-              _focusVisible={{
-                borderColor: "teal.500",
-                boxShadow: "none",
-                outline: "none"
-              }}
-
-              transition="all .2s"
             />
           </Box>
         )}
       </VStack>
 
-      {/* Buttons match your Location screen */}
       <Box mt={10}>
         <Button
           colorScheme="gray"
@@ -122,12 +103,12 @@ export default function BedBathCount({ onNext, onBack, selected }) {
         </Button>
 
         <Button
-          bg={!canContinue ? "gray.600" : "black"}
+          bg={canContinue ? "black" : "gray.600"}
           color="white"
           rounded="full"
           px={8}
-          opacity={!canContinue ? 0.6 : 1}
-          cursor={!canContinue ? "not-allowed" : "pointer"}
+          opacity={canContinue ? 1 : 0.6}
+          cursor={canContinue ? "pointer" : "not-allowed"}
           isDisabled={!canContinue}
           onClick={canContinue ? handleContinue : undefined}
         >

@@ -8,13 +8,18 @@ export default function StructChanges({ onBack, onNext, answers }) {
   const bedroomCount = answers?.bedrooms_to_reno ?? 0;
   const bathroomCount = answers?.bathrooms_to_reno ?? 0;
   const renovationTypes = answers?.renovation_type ?? [];
+  const isFullReno = renovationTypes.includes("Full renovation");
+
 
   // Build card list just like SqftToAdd style
-  const roomList = [
-    ...Array.from({ length: bedroomCount }, (_, i) => `Bedroom ${i + 1}`),
-    ...Array.from({ length: bathroomCount }, (_, i) => `Bathroom ${i + 1}`),
-    ...renovationTypes.filter(t => !["Bedroom", "Bathroom"].includes(t)), // other rooms
-  ];
+  const roomList = isFullReno
+  ? ["Full renovation"]
+  : [
+      ...Array.from({ length: bedroomCount }, (_, i) => `Bedroom ${i + 1}`),
+      ...Array.from({ length: bathroomCount }, (_, i) => `Bathroom ${i + 1}`),
+      ...renovationTypes.filter(t => !["Bedroom", "Bathroom"].includes(t)),
+    ];
+
 
   const [selected, setSelected] = useState(Array(roomList.length).fill(null));
 
@@ -109,7 +114,9 @@ export default function StructChanges({ onBack, onNext, answers }) {
           opacity={allSelected ? 1 : 0.6}
           cursor={allSelected ? "pointer" : "not-allowed"}
           isDisabled={!allSelected}
-          onClick={() => allSelected && onNext({ structural_changes: selected })}
+          onClick={() => allSelected && onNext({
+            structural_changes: isFullReno ? [selected[0]] : selected
+          })}
         >
           Next
         </Button>

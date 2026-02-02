@@ -30,28 +30,28 @@ export default function App() {
   console.log("Selected options length:", answers);
   
   const handleNext = (data) => {
-    const updatedAnswers = { ...answers, ...data };
-    setAnswers(updatedAnswers);
+    setAnswers(prev => ({ ...prev, ...data }));
 
-    // If step 1 was RenoType:
-    if (step === 1) {
-      const selected = data.renovation_type || [];
+    // Only RenoType controls branching
+    if (step === 1 && data.renovation_type) {
+      const selected = data.renovation_type;
 
-      // 👉 If NO Bedroom/Bathroom was selected — skip step 2
-      if (!selected.includes("Bedroom") && !selected.includes("Bathroom")) {
-        setStep(3); // jump straight to SqftToAdd
-        return;
-      }
+      const needsBedBath =
+        selected.includes("Bedroom") ||
+        selected.includes("Bathroom") ||
+        selected.includes("Full renovation");
 
-      // 👉 If Bedroom or Bathroom selected — go to BedBathCount
-      if (selected.includes("Bedroom") || selected.includes("Bathroom")) {
-        setStep(2);
-        return;
-      }
+      setStep(needsBedBath ? 2 : 3);
+      return;
     }
 
-    setStep(step + 1);
+    setStep(prev => {
+      if (prev >= 8) return 9;
+      return prev + 1;
+    });
   };
+
+
 
 
   const handleBack = () => {
@@ -148,12 +148,17 @@ export default function App() {
             <LandingPage onStart={() => setStarted(true)} />
           ) : step === 1 ? (
             <RenoType step={step} onNext={handleNext} onBack={handleBack} />
-          ) : step === 2 && (answers.renovation_type?.includes("Bedroom") || answers.renovation_type?.includes("Bathroom")) ? (
+          ) : step === 2 && (
+            answers.renovation_type?.includes("Bedroom") ||
+            answers.renovation_type?.includes("Bathroom") ||
+            answers.renovation_type?.includes("Full renovation")
+          ) ? (
             <BedBathCount 
               onNext={handleNext} 
-              onBack={()=> setStep(1)} 
+              onBack={() => setStep(1)} 
               selected={answers.renovation_type} 
             />
+
 
           ) : step === 3 ? (
             <SqftToAdd step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
@@ -169,7 +174,7 @@ export default function App() {
             //<Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
             <Location_local step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ):(
-            <CostPage step={step} cost={answers.cost} onRestart={startOver} clearAnswers={clearAnswers} />
+            <CostPage step={step} cost={answers.cost} postRenovationValue={answers.postRenovationValue} onRestart={startOver} clearAnswers={clearAnswers} />
           )}
         
       

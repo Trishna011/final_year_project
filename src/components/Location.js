@@ -38,7 +38,6 @@ export default function Location({ onBack, onNext, answers }) {
         cost: data.predicted_cost
       });
     } catch (err) {
-      console.error("Error fetching estimate:", err);
       onNext({
         ...updatedAnswers,
         cost: 0,
