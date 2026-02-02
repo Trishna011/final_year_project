@@ -6,7 +6,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-
 // 👇 Forward frontend data to Flask
 app.post("/api/estimate", async (req, res) => {
   try {
@@ -23,6 +22,23 @@ app.post("/api/estimate", async (req, res) => {
     res.status(500).json({ error: "Failed to contact prediction service" });
   }
 });
+
+app.post("/api/value", async (req, res) => {
+  try {
+    const flaskResponse = await fetch("http://localhost:5001/value", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+
+    const value = await flaskResponse.json();
+    res.json(value);
+  } catch (err) {
+    console.error("Error contacting Flask value API:", err);
+    res.status(500).json({ error: "Failed to contact value service" });
+  }
+});
+
 
 // Start server
 

@@ -375,28 +375,17 @@ for col in ["structural_changes", "material_grade"]:
 train_path = os.path.join("processed_data", "synthetic_train_preprocessed.csv")
 val_path = os.path.join("processed_data", "synthetic_val_preprocessed.csv")
 
+FEATURE_COLS = train_df.drop(columns=["post_renovation_value"]).columns.tolist()
+
+with open(
+    "preprocessing_artifacts/feature_columns.json",
+    "w"
+) as f:
+    json.dump(FEATURE_COLS, f)
+
+
 train_df.to_csv(train_path, index=False)
 val_df.to_csv(val_path, index=False)
 
 print("Saved train data to:", train_path)
 print("Saved validation data to:", val_path)
-
-# # # save location frequency encoding
-# # location_freq_path = os.path.join("preprocessing_artifacts", "location_frequency.json")
-# # with open(location_freq_path, "w", encoding="utf-8") as f:
-# #     json.dump(location_freq.to_dict(), f, ensure_ascii=False, indent=2)
-
-# # save renovation type schema
-# schema_path = os.path.join("preprocessing_artifacts", "renovation_type_schema.json")
-# with open(schema_path, "w", encoding="utf-8") as f:
-#     json.dump(
-#         {
-#             "fixed_types": fixed_types,
-#             "numeric_scaled_columns": num_cols
-#         },
-#         f,
-#         ensure_ascii=False,
-#         indent=2
-#     )
-
-# print("Saved preprocessing artifacts")
