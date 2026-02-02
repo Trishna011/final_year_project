@@ -375,6 +375,7 @@ for col in ["structural_changes", "material_grade"]:
 train_path = os.path.join("processed_data", "synthetic_train_preprocessed.csv")
 val_path = os.path.join("processed_data", "synthetic_val_preprocessed.csv")
 
+#save feature columns to use for user inputs
 FEATURE_COLS = train_df.drop(columns=["post_renovation_value"]).columns.tolist()
 
 with open(
