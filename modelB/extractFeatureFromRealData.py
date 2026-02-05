@@ -2,8 +2,10 @@ import re
 import numpy as np
 import pandas as pd
 import spacy
+from model.featureEngineering import reno_cost_for_real_data
 
-df_real = pd.read_csv("processed_data/real_val_preprocessed.csv")
+df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
+#df_real = pd.read_csv("processed_data/real_val_preprocessed.csv")
 
 # add unique id per row
 df_real.insert(0, "id", range(1, len(df_real) + 1))
@@ -341,7 +343,6 @@ def extract_material_grade(text, price, threshold=0.75):
 
     return max(scores, key=scores.get)
 
-
 # def extract_structural_changes(text, row_id):
 #     text = str(text).lower()
 #     doc = nlp(text)
@@ -389,6 +390,12 @@ def extract_structural_changes(text, row_id, df, size_store):
                 "room": r,
                 "property_size": float(property_size)
             })
+            
+    #which room was extended
+    if extended_rooms:
+        df.at[row_id, "extended_rooms"] = ", ".join(sorted(extended_rooms))
+    else:
+        df.at[row_id, "extended_rooms"] = ""
         
     if found:
         return 1, list(extended_rooms) if extended_rooms else ["other/custom"]
@@ -487,7 +494,7 @@ def extract_structured_features(df, description_col):
     # df[['structural_changes', 'structural_rooms']] = (
     #     text.apply(lambda t: pd.Series(extract_structural_changes(t)))
     # )
-
+    df["extended_rooms"] = ""
     df[['structural_changes', 'structural_rooms']] = df.apply(
             lambda row: pd.Series(
             extract_structural_changes(row[description_col], row.name, df, structural_property_sizes)
@@ -519,7 +526,6 @@ def extract_structured_features(df, description_col):
 
     #sqft to reno
     sqft_reno = extract_sqft_renovated(renovation_room_sizes)
-    print(renovation_room_sizes)
 
     df["sqft_renovated"] = df.index.map(
         lambda idx: sqft_reno.get(idx + 1, 0)
@@ -527,6 +533,13 @@ def extract_structured_features(df, description_col):
 
 
     return df
+
+def extract_reno_cost(
+):
+    # Call the renovation cost pipeline
+    df_with_cost = reno_cost_for_real_data()
+
+    return df_with_cost
 
 
 df_extracted = extract_structured_features(
@@ -549,4 +562,6 @@ df_extracted[
 ].head(10)
 
 
-df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms.csv", index=False)
+df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms.csv", index=False)
+#df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms.csv", index=False)
+df_final = extract_reno_cost()

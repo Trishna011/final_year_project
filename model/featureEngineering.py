@@ -391,6 +391,12 @@ def expand_records(data):
     }
 
     # ---------- Convert structural list → bedrooms/bathrooms/other chunks ----------
+    struct_raw = data.get("structural_changes", [])
+
+    #struct change is already encoded in real data
+    if isinstance(struct_raw, (int, float, bool)):
+        struct_raw = [struct_raw]
+    
     total_units = bedrooms + bathrooms + len([t for t in renovation_types if t not in ["Bedroom","Bathroom"]])
 
     # pad list to avoid index error
@@ -446,3 +452,78 @@ def expand_records(data):
         })
 
     return output
+
+def expand_records_real(row):
+    output = []
+
+    renovation_type = row.get("type_of_renovation")
+    property_size = row.get("property_size")
+    location = row.get("Location")
+    material_grade = row.get("material_grade")
+
+    sqft_add = row.get("sqft_to_add", 0)
+    sqft_reno = row.get("sqft_renovated", 0)
+
+    structural_flag = int(row.get("structural_changes", 0))
+    extended_rooms_raw = row.get("extended_rooms", "")
+
+    if isinstance(extended_rooms_raw, str) and extended_rooms_raw.strip() != "":
+        extended_rooms = [r.strip() for r in extended_rooms_raw.split(",")]
+    else:
+        extended_rooms = []
+
+    if isinstance(renovation_type, str):
+        renovation_rooms = [renovation_type]
+    elif isinstance(renovation_type, list):
+        renovation_rooms = renovation_type
+    else:
+        return []
+
+    for room in renovation_rooms:
+        is_structural = 0
+        if structural_flag == 1 and room in extended_rooms:
+            is_structural = 1
+
+        output.append({
+            "property_size": property_size,
+            "Location": location,
+            "material_grade": material_grade,
+            "renovation_type": room,
+            "sqft_to_add_to_property": sqft_add if is_structural == 1 else 0,
+            "sqft_renovated": sqft_reno,
+            "structural_changes": is_structural
+        })
+
+    return output
+
+
+def reno_cost_for_real_data(
+    csv_path="processed_data/real_with_extracted_features_synonyms.csv",
+    output_path="processed_data/real_with_predicted_reno_cost.csv"
+):
+    df = pd.read_csv(csv_path)
+    df = df.drop(columns=["description","price", "num_of_bedrooms", "num_of_bathrooms"], errors="ignore")
+
+
+    predictions = []
+
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+
+        expanded_records = expand_records_real(row_dict)
+        print(expanded_records)
+
+        total_cost = 0.0
+        for record in expanded_records:
+            record = add_labour_rate(record)
+            cost = float(prediction(record))
+            total_cost += cost
+
+        predictions.append(total_cost)
+
+    df["predicted_renovation_cost"] = predictions
+
+    df.to_csv(output_path, index=False)
+    print(f"Saved predictions to {output_path}")
+
+    return df

@@ -183,8 +183,8 @@ def split_encode(df,name):
     real_val_df["location"] = (
         real_val_df["Location"].map(location_means_full).fillna(global_mean)
     )
-    real_train_df = real_train_df.drop(columns=["Location"])
-    real_val_df = real_val_df.drop(columns=["Location"])
+    #real_train_df = real_train_df.drop(columns=["Location"])
+    #real_val_df = real_val_df.drop(columns=["Location"])
 
 
     print(real_train_df.head())
