@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import random
+from datasets import Dataset, DatasetDict
 
 # ------------------------------------------------------
 # Adds estimated pre-renovation cost of property to data
@@ -19,7 +20,7 @@ csv_path = PROJECT_ROOT.parent / "synthetic_renovation_scenarios_with_costs.csv"
 # -----------------------------
 df = pd.read_csv(csv_path)
 
-# Normalise column names
+# Normalise column names to lower-case and trim whitespace so mappings are stable.
 df.columns = df.columns.str.strip().str.lower()
 
 print("Available columns:")
@@ -35,35 +36,39 @@ RENOVATION_COST_COL = "renovation_cost"
 # -----------------------------
 # Price model
 # -----------------------------
-BASE_PRICE_PER_SQFT = 260
 
+# BASE_PRICE_PER_SQFT: baseline market price per sqft used before adjustments.
+BASE_PRICE_PER_SQFT = 284
+
+# LOCATION_MULTIPLIER: multiplies base price for locality-based market differences.
 LOCATION_MULTIPLIER = {
-    "manchester city centre": 1.20,
-    "salford": 1.05,
-    "stockport": 1.00,
+    "manchester city centre": 1.39,
+    "salford": 1.41,
+    "stockport": 0.98,
     "bolton": 0.85,
-    "bury": 0.90,
-    "oldham": 0.78,
-    "rochdale": 0.75,
-    "tameside": 0.88,
-    "wigan": 0.82,
-    "altrincham": 1.30,
-    "prestwich": 1.10,
-    "didsbury": 1.25,
-    "chorlton": 1.20,
-    "withington": 1.05,
-    "levenshulme": 1.00,
-    "sale": 1.15,
-    "stretford": 1.05,
-    "cheadle": 1.22,
-    "ashton-under-lyne": 0.80,
-    "trafford": 1.28,
+    "bury": 0.87,
+    "oldham": 0.82,
+    "rochdale": 0.64,
+    "tameside": 0.81,
+    "wigan": 0.57,
+    "altrincham": 1.52,
+    "prestwich": 1.04,
+    "didsbury": 1.17,
+    "chorlton": 1.36,
+    "withington": 1.09,
+    "levenshulme": 1.11,
+    "sale": 1.33,
+    "stretford": 1.12,
+    "cheadle": 1.25,
+    "ashton-under-lyne": 0.84,
+    "trafford": 1.27,
 }
 
 
 # -----------------------------
 # Condition inference (internal only)
 # -----------------------------
+
 def infer_condition(renovation_cost: float) -> int:
     if renovation_cost > 70000:
         return 1
@@ -76,6 +81,7 @@ def infer_condition(renovation_cost: float) -> int:
     else:
         return 5
 
+# CONDITION_DISCOUNT: multiplier applied to location-adjusted value based on inferred condition.
 CONDITION_DISCOUNT = {
     1: 0.82,
     2: 0.88,
@@ -131,13 +137,27 @@ print(
 )
 
 # -----------------------------
-# Save output
+# Save output locally
 # -----------------------------
-output_path = (
+output_csv = (
     PROJECT_ROOT.parent
-    / "synthetic_renovation_scenarios_with_pre_renovation_values.csv"
+    / "synthetic_renovation_scenarios_with_pre_cost.csv"
 )
 
-df.to_csv(output_path, index=False)
+df.to_csv(output_csv, index=False)
+print(f"Saved local copy to {output_csv}")
 
-print("Pre-renovation values generated successfully.")
+# -----------------------------
+# Push to Hugging Face
+# -----------------------------
+dataset = Dataset.from_pandas(df, preserve_index=False)
+dataset_dict = DatasetDict({"train": dataset})
+
+HF_REPO_NAME = "Trish101/reno_details_dataset"
+
+dataset_dict.push_to_hub(
+    HF_REPO_NAME,
+    private=True
+)
+
+print(f"Dataset pushed to Hugging Face: {HF_REPO_NAME}")
