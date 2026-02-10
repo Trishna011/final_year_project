@@ -4,17 +4,28 @@ import pandas as pd
 import spacy
 from model.featureEngineering import reno_cost_for_real_data
 
-df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
-#df_real = pd.read_csv("processed_data/real_val_preprocessed.csv")
+# -----------------------------
+# Load train or validation set
+# -----------------------------
+
+#df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
+df_real = pd.read_csv("processed_data/real_val_preprocessed.csv")
 
 # add unique id per row
 df_real.insert(0, "id", range(1, len(df_real) + 1))
 
+# Stores intermediate size calculations across rows
 structural_property_sizes = []
 renovation_room_sizes = []
 
+# Load spaCy medium model for word embeddings and similarity checks
 nlp = spacy.load("en_core_web_md")
 
+# -----------------------------
+# Keyword and semantic setup
+# -----------------------
+
+# Lemmas that indicate structural changes
 STRUCTURAL_LEMMAS = {
     "extend",
     "convert",
@@ -24,7 +35,7 @@ STRUCTURAL_LEMMAS = {
     "structural"
 }
 
-
+# Explicit renovation phrases used in pattern matching
 RENOVATION_PATTERNS = [
     r"\bnewly renovated\b",
     r"\brecently renovated\b",
@@ -43,6 +54,7 @@ RENOVATION_PATTERNS = [
     r"\bpristine\b"
 ]
 
+# Seed words representing renovation actions
 RENOVATION_SEED_WORDS = [
     "renovated",
     "refurbished",
@@ -52,8 +64,10 @@ RENOVATION_SEED_WORDS = [
     "installed"
 ]
 
+# Used to find similar words to renovation seeds to help find words other than in the list
 RENOVATION_SEED_DOCS = [nlp(w) for w in RENOVATION_SEED_WORDS]
 
+# Temporal words used to confirm recent renovation
 RENOVATION_TEMPORAL_CUES = {
     "recent",
     "recently",
@@ -67,6 +81,7 @@ ROOM_NOUNS = [
     "kitchen", "bathroom", "bedroom", "living", "lounge"
 ]
 
+# Verbs that describe property state rather than renovation, which need to be ignored
 STATE_VERBS = {
     "offer", "offers",
     "provide", "provides",
@@ -75,25 +90,30 @@ STATE_VERBS = {
     "comprise", "comprises"
 }
 
+# Material keywords grouped by quality level
 MATERIAL_SEEDS = {
     "budget-friendly": ["laminate", "vinyl", "carpet", "upvc", "acrylic", "mdf", "painted", "composite"],
     "mid-range": ["ceramic", "porcelain", "engineered", "granite", "steel", "timber", "glazed", "stoneware"],
     "high-end": ["hardwood", "marble", "quartz", "limestone", "slate", "aluminium", "brass", "bespoke"]
 }
 
+# Convert room and material words to spaCy docs to find similar words other than in the list
 ROOM_NOUN_DOCS = [nlp(w) for w in ROOM_NOUNS]
 MATERIAL_SEED_DOCS = {
     k: [nlp(w) for w in v]
     for k, v in MATERIAL_SEEDS.items()
 }
 
+# Price thresholds used to infer material quality
 PRICE_HIGH = df_real["price"].quantile(0.75)
 PRICE_LOW = df_real["price"].quantile(0.25)
 
+# Used to calculate reasonable sqft to add or renovate based on property size and room type 
 def interpolate(val, low_x, high_x, low_y, high_y):
     ratio = (val - low_x) / (high_x - low_x)
     return low_y + ratio * (high_y - low_y)
 
+# Rules mapping reasonable extension sizes depending on property sizes for each room based on government guidelines and market research
 EXTENSION_RULES = {
     "kitchen": [
         (0, 754, 108, 161),
@@ -131,6 +151,7 @@ EXTENSION_RULES = {
     ],
 }
 
+# Rules mapping reasonable renovation sizes depending on property sizes for each room based on government guidelines and market research
 RENOVATION_RULES = {
     "kitchen": [
         (0, 754, 110, 160),
@@ -168,7 +189,7 @@ RENOVATION_RULES = {
     ],
 }
 
-
+# Estimate sqft to add based on the room and property size from real data
 def compute_sqft_to_add(room, property_size):
     rules = EXTENSION_RULES.get(room, EXTENSION_RULES["other/custom"])
 
@@ -179,7 +200,8 @@ def compute_sqft_to_add(room, property_size):
             return interpolate(property_size, low_x, high_x, low_y, high_y)
 
     return np.nan
-    
+
+# Estimate sqft renovated based on the room and property size from real data
 def compute_sqft_renovated_for_room(room, property_size):
     rules = RENOVATION_RULES.get(room, RENOVATION_RULES["other/custom"])
 
@@ -191,8 +213,13 @@ def compute_sqft_renovated_for_room(room, property_size):
 
     return 0
 
-#RENOVATION TYPE HELPERS
+# -----------------------------
+# Renovation detection helpers
+# -----------------------------
+
+# Check whether a token semantically represents renovation
 def is_semantic_renovation_token(token, threshold=0.65):
+    
     # only allow verbs and adjectives
     if token.pos_ not in {"VERB", "ADJ"}:
         return False
@@ -208,15 +235,18 @@ def is_semantic_renovation_token(token, threshold=0.65):
 
     return False
 
+# Detect temporal words near a renovation token to confirm recent renovation
 def has_temporal_cue(window):
     return any(t.lemma_ in RENOVATION_TEMPORAL_CUES for t in window)
 
+# Identify whether a noun token represents a room based on similarity to room seed words
 def is_room_noun(token, threshold=0.65):
     for r in ROOM_NOUN_DOCS:
         if token.similarity(r) >= threshold:
             return r.text
     return None
 
+# Used to detect if a renovation token is detected and if so looks at context words to work out what room has been renovated
 def embedding_renovation_detector(text, window_size=30):
     text = str(text).lower()
     doc = nlp(text)
@@ -260,7 +290,11 @@ def embedding_renovation_detector(text, window_size=30):
 
     return np.nan
 
-#STRUCTUAL CHANGE HELPERS
+# -----------------------------
+# Structural change detection
+# -----------------------------
+
+# Used to detect which room has been structually changed by looking at nearby nouns to the structural change token and checking if they are rooms or not. If no nearby nouns are found, we assume it is a custom/other structural change. We also add a window around the token to check for nearby nouns as sometimes the room may not be directly next to the structural change word.
 
 def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2): 
     rooms = set() 
@@ -268,15 +302,7 @@ def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2):
     end = min(stuct_change_indicator.i + window_size + 1, len(doc))
     window = doc[start:end] 
     found_noun = False
-    # for t in window:
-    #     if t.pos_ == "NOUN": 
-    #         lemma = t.lemma_ 
-    #         if lemma in ROOM_NOUNS: 
-    #             rooms.add(lemma) 
-    #         else:
-    #             rooms.add("other/custom")
     
-    # return list(rooms)
     for t in window:
         if t.pos_ == "NOUN":
             found_noun = True
@@ -290,6 +316,9 @@ def structural_changed_room(stuct_change_indicator, doc, row_id, window_size=2):
 
     return list(rooms)
 
+#Heuristic to check whether a token represents a structural event:
+    #- adjectival past participles ("extended kitchen") or
+    #- verbs in past/past-participle form ("was converted", "has been extended").
 
 def is_actual_structural_event(token):
     # Case 1: past participle used adjectivally
@@ -304,7 +333,11 @@ def is_actual_structural_event(token):
 
     return False
 
-#MATERIAL GRADE HELPER
+# -----------------------------
+# Material grade extraction
+# -----------------------------
+
+# Based on the price of the property, infer material grade
 def price_material_signal(price):
     if price >= PRICE_HIGH:
         return {"high-end": 1.5, "mid-range": 0.5, "budget-friendly": 0}
@@ -313,6 +346,7 @@ def price_material_signal(price):
     return {"high-end": 0.3, "mid-range": 1.0, "budget-friendly": 0.3}
 
 
+# Infer material quality using words and price
 def extract_material_grade(text, price, threshold=0.75):
     text = str(text).lower()
     doc = nlp(text)
@@ -343,26 +377,8 @@ def extract_material_grade(text, price, threshold=0.75):
 
     return max(scores, key=scores.get)
 
-# def extract_structural_changes(text, row_id):
-#     text = str(text).lower()
-#     doc = nlp(text)
 
-#     for token in doc:
-
-#         # must represent an actual event, not a possibility
-#         if not is_actual_structural_event(token):
-#             continue
-
-#         #cannot compare the lemma of the token to STRUCTURAL_LEMMAS as spaCey treats 
-#         #adjectives in the past as already lemmatised
-#         if not any(token.lower_.startswith(s) for s in STRUCTURAL_LEMMAS):
-#             continue
-
-#         rooms = structural_changed_room(token, doc, row_id)
-#         return 1, rooms if rooms else []
-
-#     return 0, []
-
+# Look for indicators of extensions and find whichg rooms have been extended and therefore strucutally changed
 def extract_structural_changes(text, row_id, df, size_store):
     text = str(text).lower()
     doc = nlp(text)
@@ -403,7 +419,7 @@ def extract_structural_changes(text, row_id, df, size_store):
     return 0, []
 
 
-
+# Extract which type of room has been renovated based on explicit renovation keywords and semantic detection. We also use the number of rooms detected as renovated as a signal, where if 4 or more rooms are detected as renovated we classify it as a full renovation. We also store the detected renovation rooms and property size in a separate store to calculate sqft renovated later.
 def extract_renovation_type(text, rooms, rowid, df, store):
     text = str(text).lower()
     renovation_rooms = set()
@@ -441,6 +457,7 @@ def extract_renovation_type(text, rooms, rowid, df, store):
 
     return np.nan
 
+# Extract sqft to add based on the detected structural changes and property sizes from real data
 def extract_sqft_to_add(structural_property_sizes):
     sqft_by_row = {}
 
@@ -461,6 +478,7 @@ def extract_sqft_to_add(structural_property_sizes):
 
     return sqft_by_row
 
+# Extract sqft renovated based on the detected renovation rooms and property sizes from real data
 def extract_sqft_renovated(renovation_room_sizes):
     sqft_by_row = {}
 
@@ -481,19 +499,19 @@ def extract_sqft_renovated(renovation_room_sizes):
 
     return sqft_by_row
 
-
-def extract_structured_features(df, description_col):
+# -----------------------------
+# Main feature extraction
+# -----------------------------
+def extract_features(df, description_col):
     df = df.copy()
 
+    # Extract material grade
     df['material_grade'] = df.apply(
         lambda row: extract_material_grade(row[description_col], row["price"]),
         axis=1
     )
     
-    # # APPLY structural extraction PER ROW
-    # df[['structural_changes', 'structural_rooms']] = (
-    #     text.apply(lambda t: pd.Series(extract_structural_changes(t)))
-    # )
+    # Find which rooms have been extended based on structural changes
     df["extended_rooms"] = ""
     df[['structural_changes', 'structural_rooms']] = df.apply(
             lambda row: pd.Series(
@@ -517,14 +535,14 @@ def extract_structured_features(df, description_col):
     # cleanup if you do not want to keep rooms
     df.drop(columns=['structural_rooms'], inplace=True)
 
-    #sqft to add
+    # Extract sqft to add
     sqft_lookup = extract_sqft_to_add(structural_property_sizes)
 
     df["sqft_to_add"] = df.index.map(
         lambda idx: sqft_lookup.get(idx + 1, 0)
     )
 
-    #sqft to reno
+    # Extract sqft renovated
     sqft_reno = extract_sqft_renovated(renovation_room_sizes)
 
     df["sqft_renovated"] = df.index.map(
@@ -536,13 +554,13 @@ def extract_structured_features(df, description_col):
 
 def extract_reno_cost(
 ):
-    # Call the renovation cost pipeline
+    # Call the renovation cost pipeline to estimate the renovation cost based on the real data using my Model 1
     df_with_cost = reno_cost_for_real_data()
 
     return df_with_cost
 
 
-df_extracted = extract_structured_features(
+df_extracted = extract_features(
     df_real,
     description_col="description"
 )
@@ -562,6 +580,6 @@ df_extracted[
 ].head(10)
 
 
-df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms.csv", index=False)
-#df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms.csv", index=False)
+#df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms.csv", index=False)
+df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms.csv", index=False)
 df_final = extract_reno_cost()

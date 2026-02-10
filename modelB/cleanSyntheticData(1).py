@@ -27,18 +27,6 @@ df = dataset.to_pandas()
 df = df.drop_duplicates()
 print("After removing duplicates:", df.shape)
 
-#lightly preprocess post-reno desc by lowercasing, removing white spaces and normalising
-def clean_text(text):
-    if pd.isna(text):
-        return ""
-    text = str(text)
-    text = text.lower()
-    text = text.strip()
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[^\w\s]", "", text)
-    return text
-
-df["post_renovation_description"] = df["post_renovation_description"].apply(clean_text)
 
 #spotting outliers
 def extract_sqft(value):
@@ -374,6 +362,7 @@ for col in ["structural_changes", "material_grade"]:
 # save processed datasets
 train_path = os.path.join("processed_data", "synthetic_train_preprocessed.csv")
 val_path = os.path.join("processed_data", "synthetic_val_preprocessed.csv")
+
 
 #save feature columns to use for user inputs
 FEATURE_COLS = train_df.drop(columns=["post_renovation_value"]).columns.tolist()

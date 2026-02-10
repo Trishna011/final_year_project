@@ -7,9 +7,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import Ridge
 import spacy
 
-folder_path = "../../model_2_real_data"
+folder_path = "../../model_2_real_data_2"
+
+# Load spaCy English model for tokenisation and stopword removal
 nlp = spacy.load("en_core_web_sm")
 
+# Collect paths of all CSV files in the folder
 all_files = [
     os.path.join(folder_path, f)
     for f in os.listdir(folder_path)
@@ -18,10 +21,12 @@ all_files = [
 
 dfs = []
 
+# Read each CSV file and store as a DataFrame
 for file in all_files:
     df_part = pd.read_csv(file)
     dfs.append(df_part)
 
+# Combine all CSVs into one DataFrame
 real_df = pd.concat(dfs, ignore_index=True)
 
 print("Files loaded:", len(all_files))
@@ -31,42 +36,54 @@ print("Total rows:", real_df.shape)
 real_df = real_df.drop(columns=["URL"], errors="ignore")
 real_df = real_df.drop(columns=["Unnamed: 7"], errors="ignore")
 real_df = real_df.drop(columns=["Unnamed: 8"], errors="ignore")
+
+# Remove rows that are completely empty
 real_df = real_df.dropna(how="all")
-
-
 
 #remove duplicates
 real_df = real_df.drop_duplicates()
 print("After removing duplicates:", real_df.shape)
 
+# Check for missing Location values
 nan_locations = real_df[real_df["Location"].isna()]
 
 print("Rows with NaN in Location:")
 print(nan_locations)
 
+# -----------------------------
+# Price cleaning
+# -----------------------------
 def clean_price(x):
+    # Convert price strings like "£250,000" to float
     if pd.isna(x):
         return np.nan
     x = str(x)
     x = x.replace("£", "").replace(",", "").strip()
     return float(x)
 
+# Create numeric price column
 real_df["price"] = real_df["Price"].apply(clean_price)
 real_df = real_df.drop(columns=["Price"])
 
 
-#lightly clean the description
+# -----------------------------
+# Text cleaning and tokenisation
+# -----------------------------
 def clean_text(text):
+    # Handle missing text
     if pd.isna(text):
         return ""
+    # Basic normalisation
     text = str(text)
     text = text.lower()
     text = text.strip()
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[^\w\s]", "", text)
 
+    # Tokenise with spaCy
     doc = nlp(text)
 
+    # Keep useful tokens only
     tokens = [
         token.text
         for token in doc
@@ -76,61 +93,45 @@ def clean_text(text):
 
     return " ".join(tokens)
 
+# Clean description text
 real_df["description"] = real_df["Description"].apply(clean_text)
 real_df = real_df.drop(columns=["Description"])
 
-real_df_reno_removed = real_df.copy()
+# -----------------------------
+# TF IDF analysis
+# -----------------------------
+# Text input
+X = real_df["description"].fillna("")
 
-#remove the words that indicate renovation
-RENOVATION_PATTERNS = [
-    r"\bnewly renovated\b",
-    r"\brecently renovated\b",
-    r"\brenovat\w*\b",
-    r"\brefurbish\w*\b",
-    r"\bnewly refurbished\b",
-    r"\bcompletely refurbished\b",
-    r"\bmoderni[sz]e\w*\b",
-    r"\bmodernized\b",
-    r"\bupgrade\w*\b",
-    r"\brefit\w*\b",
-    r"\bfinished to a high standard\b",
-    r"\brecently upgraded\b",
-    r"\bhigh\s+standard\b",
-    r"\bimmaculate\b",
-    r"\bpristine\b"
-]
+# Target variable
+y = real_df["price"]
 
-def remove_renovation_words(text):
-    if pd.isna(text):
-        return ""
-    text = str(text).lower()
-    for pattern in RENOVATION_PATTERNS:
-        text = re.sub(pattern, "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-real_df_reno_removed["description"] = real_df_reno_removed["description"].apply(remove_renovation_words)
-
-#test if there are any synonyms to remove
-X = real_df_reno_removed["description"].fillna("")
-y = real_df_reno_removed["price"]
-
+# Split into train and validation
 X_train, X_val, y_train, y_val = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
+# Configures a TF–IDF vectoriser that:
+# ignores tokens seen in fewer than 5 documents (min_df=5),
+# uses unigrams and bigrams (ngram_range=(1,2)),
+# removes English stop words.
 tfidf = TfidfVectorizer(
     min_df=5,
     ngram_range=(1,2),
     stop_words="english"
 )
 
+#Learns the TF–IDF vocabulary and IDF weights from the training text and converts training text to a sparse feature matrix.
 X_train_tfidf = tfidf.fit_transform(X_train)
+
+#Converts validation text to the same TF–IDF feature space (no refitting) to avoid data leakage.
 X_val_tfidf = tfidf.transform(X_val)
 
+# Train ridge regression on text features to measure how words in the property description relate to price.
 model = Ridge(alpha=1.0)
 model.fit(X_train_tfidf, y_train)
 
+# Inspect which words increase or decrease price
 feature_names = np.array(tfidf.get_feature_names_out())
 coefs = model.coef_
 
@@ -143,13 +144,19 @@ print(top_pos)
 print("\nTop price decreasing words:")
 print(top_neg)
 
-[w for w in feature_names if "renovat" in w]
-[w for w in feature_names if "refurb" in w]
-[w for w in feature_names if "modern" in w]
-
-
+# -----------------------------
+# Location target encoding
+# -----------------------------
 def split_encode(df,name):
-    #split data 20% valiation 80% training
+    """
+    Create train/validation CSVs with a target-encoded 'location' column.
+    Procedure:
+      - split 80/20 train/validation stratified by Location
+      - perform KFold target-encoding on training data to avoid leakage
+      - map full-training-location-means to validation set
+      - save resulting CSVs under processed_data/
+    """
+
     real_train_df, real_val_df = train_test_split(
         df,
         test_size=0.2,
@@ -160,14 +167,16 @@ def split_encode(df,name):
     print("Train:", real_train_df.shape)
     print("Validation:", real_val_df.shape)
 
-
-
     target_col = "price"
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
+    ## Initialise placeholder column for out-of-fold location encoding.
     real_train_df["location"] = 0.0
+
+    # Global mean price
     global_mean = real_train_df[target_col].mean()
 
+    # Out of fold encoding
     for train_idx, val_idx in kf.split(real_train_df):
         fold_train = real_train_df.iloc[train_idx]
         fold_val = real_train_df.iloc[val_idx]
@@ -177,24 +186,21 @@ def split_encode(df,name):
         real_train_df.loc[fold_val.index, "location"] = (
             fold_val["Location"].map(location_means).fillna(global_mean)
         )
-
+    
+    # Encode validation using full training data
     location_means_full = real_train_df.groupby("Location")[target_col].mean()
 
     real_val_df["location"] = (
         real_val_df["Location"].map(location_means_full).fillna(global_mean)
     )
-    #real_train_df = real_train_df.drop(columns=["Location"])
-    #real_val_df = real_val_df.drop(columns=["Location"])
-
-
     print(real_train_df.head())
     print(real_val_df.head())
 
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed.csv")
-    val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed.csv")
+    train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed2.csv")
+    val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed2.csv")
 
     real_train_df.to_csv(train_path, index=False)
     real_val_df.to_csv(val_path, index=False)
@@ -203,4 +209,3 @@ def split_encode(df,name):
     print("Saved real validation data to:", val_path)
 
 split_encode(real_df, "real")
-split_encode(real_df_reno_removed, "real_df_reno_removed")
