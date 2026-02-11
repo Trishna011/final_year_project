@@ -2,33 +2,30 @@ from datasets import load_dataset
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import RobustScaler, LabelEncoder, PolynomialFeatures
-import category_encoders as ce
-from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, train_test_split, KFold
-from sklearn.linear_model import LassoCV
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, make_scorer, root_mean_squared_error, mean_absolute_error,r2_score
+from sklearn.model_selection import train_test_split, KFold
 import numpy as np
-import shap, xgboost
 import json
 from mlxtend.plotting import heatmap
-import joblib
 import os
-import re
 import ast
-from sentence_transformers import SentenceTransformer
-from catboost import CatBoostRegressor
 
+# -----------------------------
+# Load synthetic renovation dataset from hugging face
+# -----------------------------
 
-#load the dataset from hugging face
 dataset = load_dataset("Trish101/reno_details_dataset", split="train")
+
+# Convert to pandas DataFrame
 df = dataset.to_pandas()
+
 #get rid of duplicate rows
 df = df.drop_duplicates()
 print("After removing duplicates:", df.shape)
 
 
-#spotting outliers
+# -----------------------------
+# Helper to extract total square footage from nested fields
+# -----------------------------
 def extract_sqft(value):
     if isinstance(value, (int, float)):
         return value
@@ -44,7 +41,7 @@ def extract_sqft(value):
             return np.nan
     return np.nan
 
-# remove logically invalid and economically impossible rows
+# Remove logically invalid or economically impossible rows
 df = df[
     (df["property_size"] > 0) &
     (df["pre_renovation_cost"] > 0) &
@@ -52,10 +49,22 @@ df = df[
     (df["renovation_cost"] <= df["pre_renovation_cost"] * 2)
 ]
 
-print("After rule based filtering:", df.shape)
+# Bedrooms and bathrooms must:
+# - Be non negative
+# - Be whole numbers
+# - Not exceed 10
+df = df[
+    (df["bedrooms_to_reno"] >= 0) &
+    (df["bedrooms_to_reno"] % 1 == 0) &
+    (df["bedrooms_to_reno"] <= 10) &
+    (df["bathrooms_to_reno"] >= 0) &
+    (df["bathrooms_to_reno"] % 1 == 0) &
+    (df["bathrooms_to_reno"] <= 10)
+]
 
-
-# define numeric columns for IQR
+# -----------------------------
+# Outlier detection using IQR - only for visualisation purposes
+# -----------------------------
 iqr_cols = [
     "renovation_cost",
     "pre_renovation_cost",
@@ -90,20 +99,13 @@ bathroom_outliers = count_outliers(df["bathrooms_to_reno"], 10)
 print("bedrooms_to_reno outliers:", len(bedroom_outliers))
 print("bathrooms_to_reno outliers:", len(bathroom_outliers))
 
-df = df[
-    (df["bedrooms_to_reno"] >= 0) &
-    (df["bedrooms_to_reno"] % 1 == 0) &
-    (df["bedrooms_to_reno"] <= 10) &
-    (df["bathrooms_to_reno"] >= 0) &
-    (df["bathrooms_to_reno"] % 1 == 0) &
-    (df["bathrooms_to_reno"] <= 10)
-]
 
 # plot boxplots for IQR based columns
 plt.figure(figsize=(12, 6))
 sns.boxplot(data=df[cols_with_outliers])
 plt.xticks(rotation=45)
 #plt.show()
+
 
 # ordinal encode material_grade
 grade_map = {
@@ -122,30 +124,27 @@ def normalize_grade(text):
 # synthetic post renovation value
 # -------------------------------
 
-# -------------------------------
-# synthetic post renovation value
-# realistic formulation
-# -------------------------------
-
 BASE_UPLIFT = 0.015
 MAX_TOTAL_UPLIFT = 0.18
 
 def compute_renovation_uplift(row):
     uplift = BASE_UPLIFT
 
+    # Kitchen and full renovations add higher value
     uplift += 0.03 * ("Kitchen" in str(row.get("renovation_type", "")))
     uplift += 0.015 * ("Bathroom" in str(row.get("renovation_type", "")))
     uplift += 0.03 * ("Full renovation" in str(row.get("renovation_type", "")))
     
-
+    # Adding square footage increases value
     uplift += min(
         row.get("sqft_to_add_num", 0) / max(row.get("property_size", 1), 1),
         0.10
     )
 
+    # Cap total uplift for realism
     return min(uplift, MAX_TOTAL_UPLIFT)
 
-
+#This part converts material quality into a numeric multiplier that increases the post renovation property value.
 def compute_material_multiplier(value):
     if pd.isna(value):
         return 1.0
@@ -183,11 +182,12 @@ def compute_material_multiplier(value):
 renovation_uplift = df.apply(compute_renovation_uplift, axis=1)
 material_multiplier = df["material_grade"].apply(compute_material_multiplier)
 
-# cost influence ratio (bounded)
+# measures how large the renovation is relative to the house value, then limits its influence for realism and stability.
 cost_ratio = (
     df["renovation_cost"] / df["pre_renovation_cost"]
 ).clip(upper=0.5)
 
+# Estimate post renovation value for synthetic data
 df["post_renovation_value"] = (
     df["pre_renovation_cost"]
     * (
@@ -198,24 +198,7 @@ df["post_renovation_value"] = (
 )
 
 
-# df["renovation_value_uplift_pct"] = (
-#     (df["post_renovation_value"] - df["pre_renovation_cost"])
-#     / df["pre_renovation_cost"]
-# ) * 100
-
-# df["pre_reno"] = (
-#     df["pre_renovation_cost"]
-# )
-
-# uplift_pct = df["renovation_value_uplift_pct"]
-
-# print(uplift_pct.describe())
-# print("Share above 20%:", (uplift_pct > 20).mean())
-# print("Share above 25%:", (uplift_pct > 25).mean())
-# print("Share above 30%:", (uplift_pct > 30).mean())
-
-
-#Data split synthetic data as 80% train and 20% test
+#Data split synthetic data as 80% train and 20% val
 train_df, val_df = train_test_split(
     df,
     test_size=0.2,
@@ -252,7 +235,7 @@ def encode_structural_changes_lists(value):
 train_df["structural_changes"] = train_df["structural_changes"].apply(encode_structural_changes_lists)
 val_df["structural_changes"] = val_df["structural_changes"].apply(encode_structural_changes_lists)
 
-#target encode location
+# target encoding on the location feature using KFold to prevent leakage.
 target_col = "post_renovation_value"
 
 kf = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -277,8 +260,7 @@ val_df["location"] = (
     val_df["location"].map(location_means_full).fillna(global_mean)
 )
 
-
-
+# Encode each item in the material grade list
 def encode_material_grade_lists(value):
     if pd.isna(value):
         return {}
