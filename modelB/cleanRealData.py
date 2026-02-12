@@ -7,7 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import Ridge
 import spacy
 
-folder_path = "../../model_2_real_data_2"
+folder_path = "../../model_2_real_data_3"
 
 # Load spaCy English model for tokenisation and stopword removal
 nlp = spacy.load("en_core_web_sm")
@@ -157,15 +157,23 @@ def split_encode(df,name):
       - save resulting CSVs under processed_data/
     """
 
-    real_train_df, real_val_df = train_test_split(
+    real_train_df, temp_df = train_test_split(
         df,
-        test_size=0.2,
+        test_size=0.3,
+        random_state=42,
+        stratify=df["Location"]
+    )
+
+    real_val_df, test_df = train_test_split(
+        temp_df,
+        test_size=0.5,
         random_state=42,
         stratify=df["Location"]
     )
 
     print("Train:", real_train_df.shape)
     print("Validation:", real_val_df.shape)
+    print("Test:", test_df.shape)
 
     target_col = "price"
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -193,19 +201,23 @@ def split_encode(df,name):
     real_val_df["location"] = (
         real_val_df["Location"].map(location_means_full).fillna(global_mean)
     )
-    print(real_train_df.head())
-    print(real_val_df.head())
+
+    test_df["location"] = (
+        test_df["Location"].map(location_means_full).fillna(global_mean)
+    )
 
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed2.csv")
     val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed2.csv")
+    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed.csv")
 
     real_train_df.to_csv(train_path, index=False)
     real_val_df.to_csv(val_path, index=False)
 
     print("Saved real training data to:", train_path)
     print("Saved real validation data to:", val_path)
+    print("Saved real validation data to:", test_path)
 
 split_encode(real_df, "real")

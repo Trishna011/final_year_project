@@ -1,113 +1,392 @@
 import json
-import numpy as np
 import pandas as pd
+import numpy as np
+import ast
+from catboost import CatBoostRegressor, Pool
 from sklearn.metrics import r2_score
-from catboost import CatBoostRegressor
+import random
 
-# load real model
-real_model = CatBoostRegressor()
-real_model.load_model("modelB/models/real_catboost_model.cbm")
+# -----------------------------
+# helpers
+# -----------------------------
+def mape(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    mask = y_true != 0
+    return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
 
-# load synthetic model
+
+# Normalize material text into consistent format
+def normalize_material(x):
+    if pd.isna(x):
+        return np.nan
+    return (
+        str(x)
+        .lower()
+        .strip()
+        .replace("_", "-")
+        .replace(" ", "-")
+    )
+
+# Normalize renovation tokens
+def normalize_token(x):
+    return " ".join(x.lower().strip().split())
+
+# Parse renovation type column into list format
+def parse_reno(value):
+    if pd.isna(value):
+        return []
+    value = str(value)
+    if value.startswith("[") and value.endswith("]"):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return [normalize_token(v) for v in parsed if isinstance(v, str)]
+        except Exception:
+            return []
+    return [normalize_token(value)]
+
+
+# -----------------------------
+# Preprocess real dataset to match synthetic schema
+# -----------------------------
+def preprocess_real(df, require_target=False):
+    
+    # Clean renovation type column
+    df["type_of_renovation"] = df["type_of_renovation"].astype(str).str.strip().str.lower()
+    df = df[~df["type_of_renovation"].isin(["", "nan", "none", "null"])]
+
+    # Encode material grade ordinally
+    material_mapping = {
+        "budget-friendly": 0,
+        "mid-range": 1,
+        "high-end": 2
+    }
+
+    df["material_grade"] = df["material_grade"].apply(normalize_material)
+    df["material_grade"] = df["material_grade"].map(material_mapping)
+    df["material_grade"] = df["material_grade"].astype(float)
+
+    
+    # Parse renovation types into structured form
+    df["type_of_renovation_parsed"] = df["type_of_renovation"].apply(parse_reno)
+
+    # Create one hot features for renovation types
+    fixed_types = {
+        "bathroom": "bathroom",
+        "bedroom": "bedroom",
+        "kitchen": "kitchen",
+        "living room": "living_room",
+        "other/custom": "other_custom",
+        "full renovation": "full_renovation"
+    }
+
+    for suffix in fixed_types.values():
+        df[f"reno_{suffix}"] = 0
+
+    for key, suffix in fixed_types.items():
+        df[f"reno_{suffix}"] = df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
+
+    # Select first renovation type as categorical feature
+    def choose_unit_type(lst):
+        if not lst:
+            return "unknown"
+        return lst[0]
+
+    df["unit_type"] = df["type_of_renovation_parsed"].apply(choose_unit_type)
+
+    # Drop unused columns
+    df = df.drop(
+        columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id"],
+        errors="ignore"
+    )
+    return df
+
+
+# -----------------------------
+# load pretrained synthetic model
+# -----------------------------
 syn_model = CatBoostRegressor()
-syn_model.load_model("modelB/models/synthetic_catboost_model.cbm")
+syn_model.load_model("modelB/models/synthetic_catboost_best_model.cbm")
 
-# load schema used by real model
-with open("modelB/models/real_feature_columns.json", "r") as f:
-    REAL_FEATURE_COLS = json.load(f)
+# -----------------------------
+# Load saved feature schema and model parameters
+# Ensures real data matches synthetic training structure
+# -----------------------------
+with open("modelB/models/synthetic_catboost_best_params.json", "r") as f:
+    saved = json.load(f)
 
-with open("modelB/models/synthetic_feature_columns.json", "r") as f:
-    SYN_FEATURE_COLS = json.load(f)
+SYN_FEATURE_COLS = saved["feature_columns"]
+SYN_MODEL_PARAMS = saved["model_params"]
 
-df_syn = pd.read_csv("processed_data/synthetic_val_expanded.csv")
+# -----------------------------
+# prepare validation set for fine tuning
+# -----------------------------
+real_val = pd.read_csv("processed_data/real_val_with_predicted_reno_cost2.csv")
+real_val = preprocess_real(real_val, require_target=True)
 
-def value_prediction(df):
-    df = df.copy()
+# Use real price as target as price is the same as post renovation value
+real_val["post_renovation_value"] = real_val["price"]
 
-    # rename columns
-    if "structural_change" in df.columns:
-        df = df.rename(columns={
-            "structural_change": "structural_changes"
-        })
+# Ensure all required synthetic features exist
+for col in set(SYN_FEATURE_COLS) - set(real_val.columns):
+    real_val[col] = 0
 
-    # pad real model features
-    for col in REAL_FEATURE_COLS:
-        if col not in df.columns:
-            df[col] = 0
+X_val = real_val[SYN_FEATURE_COLS]
+y_val = real_val["post_renovation_value"]
 
-    X_real = df[REAL_FEATURE_COLS]
-    pred_real = np.expm1(real_model.predict(X_real))
-
-    # pad synthetic model features
-    for col in SYN_FEATURE_COLS:
-        if col not in df.columns:
-            df[col] = 0
-
-    X_syn = df[SYN_FEATURE_COLS]
-    pred_syn = syn_model.predict(X_syn)
-
-    #results = []
-
-    #find which is the best low and the best high to use
-    # for low in [0.6, 0.7, 0.8, 0.9]:
-    #     for high in [1.1, 1.2, 1.3, 1.4, 1.5]:
-    #         if low >= high:
-    #             continue
-
-    #         pred_hybrid = np.clip(
-    #             pred_syn,
-    #             low * pred_real,
-    #             high * pred_real
-    #         )
-
-    #         r2 = r2_score(y_true, pred_hybrid)
-
-    #         mae = np.mean(np.abs(y_true - pred_hybrid))
-
-    #         ratio = pred_hybrid / np.clip(pred_real, 1e-6, None)
-    #         extreme = np.mean((ratio < low) | (ratio > high))
-
-    #         results.append({
-    #             "low": low,
-    #             "high": high,
-    #             "r2": r2,
-    #             "mae": mae,
-    #             "extreme_rate": extreme
-    #         })
-
-    # results_df = pd.DataFrame(results)
-    # print(results_df.sort_values("r2", ascending=False).head(10))
-
-
-    # #combine hybrid and synthetic model
-    # • The synthetic model decides the price most of the time.
-    # • The real model only intervenes when the synthetic price looks unrealistic.
-    # • The real model never fully replaces the synthetic model.
-    # mimicing human in the loop systems 
-    # hybrid logic
-    lower = 0.6 * pred_real
-    upper = 1.5 * pred_real
-
-    pred_hybrid = np.clip(
-        pred_syn,
-        lower,
-        upper
-    )
-
-    return pred_hybrid
-
-df_syn["pred_price_hybrid"] = value_prediction(df_syn)
-
-r2 = r2_score(
-    df_syn["post_renovation_value"],
-    df_syn["pred_price_hybrid"]
+val_pool = Pool(
+    X_val,
+    y_val,
+    cat_features=[X_val.columns.get_loc("unit_type")]
 )
-print("Hybrid R2 vs synthetic target:", r2)
 
-mape = np.mean(
-    np.abs(
-        (df_syn["post_renovation_value"] - df_syn["pred_price_hybrid"]) /
-        df_syn["post_renovation_value"]
+# -----------------------------
+# Prepare real training set for fine tuning
+# -----------------------------
+real_train = pd.read_csv("processed_data/real_with_predicted_reno_cost2.csv")
+real_train = preprocess_real(real_train, require_target=True)
+
+real_train["post_renovation_value"] = real_train["price"]
+
+for col in set(SYN_FEATURE_COLS) - set(real_train.columns):
+    real_train[col] = 0
+
+X_train = real_train[SYN_FEATURE_COLS]
+y_train = real_train["post_renovation_value"]
+
+train_pool = Pool(
+    X_train,
+    y_train,
+    cat_features=[X_train.columns.get_loc("unit_type")]
+)
+
+# -----------------------------
+# tune with AAEO
+# -----------------------------
+BOUNDS = {
+    "learning_rate": (0.001, 0.04),
+    "depth": (4, 8),
+    "l2_leaf_reg": (1, 15),
+    "iterations": (150, 600)
+}
+
+# Random parameter generator
+def random_individual():
+    return {
+        "learning_rate": np.random.uniform(*BOUNDS["learning_rate"]),
+        "depth": np.random.randint(*BOUNDS["depth"] + (1,)),
+        "l2_leaf_reg": np.random.uniform(*BOUNDS["l2_leaf_reg"]),
+        "iterations": np.random.randint(*BOUNDS["iterations"] + (1,))
+    }
+
+# Evaluate parameter set using R2 on validation
+def evaluate(individual):
+    clean_params = {}
+
+    for k, v in individual.items():
+        if isinstance(v, (np.ndarray, list)):
+            v = v.item()
+
+        if k in ["depth", "iterations"]:
+            clean_params[k] = int(v)
+        else:
+            clean_params[k] = float(v)
+
+    model = CatBoostRegressor(
+        loss_function="RMSE",
+        eval_metric="R2",
+        random_seed=42,
+        verbose=False,
+        **clean_params
     )
-) * 100
-print("Hybrid MAPE:", mape)
+
+    # Fine tune starting from synthetic model
+    model.fit(
+        train_pool,
+        eval_set=val_pool,
+        init_model=syn_model,
+        use_best_model=True,
+        early_stopping_rounds=100
+    )
+
+    preds = model.predict(val_pool)
+    return r2_score(y_val, preds)
+
+# Small evolutionary optimization loop to tune CatBoost hyperparameters.
+# Find the combination of learning_rate, depth, l2_leaf_reg, and iterations that maximizes R2 on the validation set.
+
+# Create 8 candidate parameter sets per generation.
+POP_SIZE = 8
+
+# Evolve them for 10 iterations.
+GENERATIONS = 10
+
+# You randomly generate 8 different hyperparameter combinations within predefined bounds.
+population = [random_individual() for _ in range(POP_SIZE)]
+
+# Train a model for each parameter set and compute its R2 on validation data. That R2 is the fitness score.
+fitness = [evaluate(ind) for ind in population]
+
+# Find which candidate performs best.
+best_idx = np.argmax(fitness)
+best_individual = population[best_idx]
+best_score = fitness[best_idx]
+
+print("Initial best R2:", best_score)
+
+for gen in range(GENERATIONS):
+    print(f"\nGeneration {gen + 1}")
+
+    # For each generation:
+    # Create new candidates
+    new_population = []
+    
+    for i, ind in enumerate(population):
+
+        # For each current individual:
+        # With 50 percent probability:
+        if random.random() < 0.5:
+
+            # You combine it with another random candidate.
+            partner = population[np.random.randint(POP_SIZE)]
+
+            # new_value = current + random factor × difference from partner
+            # This is exploration using direction between two solutions.
+            new_ind = {
+                k: ind[k] + np.random.uniform(-0.2, 0.2) * (partner[k] - ind[k])
+                for k in ind
+            }
+        # Otherwise slightly perturb each parameter randomly.    
+        else:
+            new_ind = {
+                k: ind[k] + np.random.uniform(-0.1, 0.1)
+                for k in ind
+            }
+
+        # Force each parameter to remain within allowed limits using np.clip.
+        # This prevents invalid values.
+        new_ind["learning_rate"] = float(
+            np.clip(new_ind["learning_rate"], *BOUNDS["learning_rate"])
+        )
+
+        new_ind["depth"] = int(
+            np.clip(new_ind["depth"], *BOUNDS["depth"])
+        )
+
+        new_ind["l2_leaf_reg"] = float(
+            np.clip(new_ind["l2_leaf_reg"], *BOUNDS["l2_leaf_reg"])
+        )
+
+        new_ind["iterations"] = int(
+            np.clip(new_ind["iterations"], *BOUNDS["iterations"])
+        )
+
+        new_population.append(new_ind)
+
+    # Train a model for each new parameter set and compute R2.
+    new_fitness = [evaluate(ind) for ind in new_population]
+
+    # Replace old population with new population if fitness improves.
+    for i in range(POP_SIZE):
+        if new_fitness[i] > fitness[i]:
+            population[i] = new_population[i]
+            fitness[i] = new_fitness[i]
+
+    # Track best performing candidate across all generations.
+    gen_best_idx = np.argmax(fitness)
+    if fitness[gen_best_idx] > best_score:
+        best_score = fitness[gen_best_idx]
+        best_individual = population[gen_best_idx]
+
+    print("Best R2 so far:", best_score)
+
+    # Save best parameters found
+    best_params = {
+        "learning_rate": float(best_individual["learning_rate"]),
+        "depth": int(best_individual["depth"]),
+        "l2_leaf_reg": float(best_individual["l2_leaf_reg"]),
+        "iterations": int(best_individual["iterations"])
+        }
+
+best_params_path = "modelB/models/finetuned_best_params_AAEO.json"
+with open(best_params_path, "w") as f:
+    json.dump(best_params, f, indent=2)
+
+
+
+# -----------------------------
+# Train final fine tuned model using best parameters
+# -----------------------------
+
+with open("modelB/models/finetuned_best_params_AAEO.json", "r") as f:
+    best_params = json.load(f)
+
+
+finetuned_model = CatBoostRegressor(
+    loss_function="RMSE",
+    eval_metric="R2",
+    random_seed=42,
+    verbose=200,
+    model_shrink_rate=0.1,
+    **best_params
+)
+
+finetuned_model.fit(
+    train_pool,
+    eval_set=val_pool,
+    init_model=syn_model,
+    use_best_model=True,
+    early_stopping_rounds=100
+)
+
+
+
+#finetuned_model.save_model("modelB/models/synthetic_plus_real_catboost_model.cbm")
+
+# -----------------------------
+# Evaluate fine tuned model on real validation data
+# -----------------------------
+
+
+val_preds = finetuned_model.predict(val_pool)
+
+r2 = r2_score(y_val, val_preds)
+val_mape = mape(y_val, val_preds)
+
+print("Fine tuned model R2 on real validation:", r2)
+print("Fine tuned model MAPE on real validation:", val_mape)
+
+# -------------------------------------------
+# Load and run saved model on test data
+# -------------------------------------------
+loaded_model = CatBoostRegressor()
+loaded_model.load_model("modelB/models/synthetic_plus_real_catboost_model.cbm")
+
+
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+real_test = preprocess_real(real_test, require_target=True)
+
+real_test["post_renovation_value"] = real_test["price"]
+
+for col in set(SYN_FEATURE_COLS) - set(real_test.columns):
+    real_test[col] = 0
+
+X_test = real_test[SYN_FEATURE_COLS]
+y_test = real_test["post_renovation_value"]
+
+train_pool = Pool(
+    X_test,
+    y_test,
+    cat_features=[X_test.columns.get_loc("unit_type")]
+)
+
+test_preds = loaded_model.predict(train_pool)
+
+r2 = r2_score(y_test, test_preds)
+test_mape = mape(y_test, test_preds)
+
+print("Loaded model R2 on real test:", r2)
+print("Loaded model MAPE on real test:", test_mape)
+
+
