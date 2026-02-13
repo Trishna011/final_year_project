@@ -114,14 +114,16 @@ X_train, X_val, y_train, y_val = train_test_split(
 # -----------------------------
 def split_encode(df,name):
     """
-    Create train/validation CSVs with a target-encoded 'location' column.
+    Create train/validation and test sets with a target-encoded 'location' column.
     Procedure:
-      - split 80/20 train/validation stratified by Location
-      - perform KFold target-encoding on training data to avoid leakage
-      - map full-training-location-means to validation set
-      - save resulting CSVs under processed_data/
+       Creates a numeric encoding for "Location" based on average price.
+       Uses KFold on train_val to reduce data leakage.
+       Applies the learned encoding to the test set.
+       Saves both processed datasets as CSV files.
     """
 
+    # Split data into 85 percent train_val and 15 percent test
+    # Stratify ensures Location distribution stays balanced
     train_val_df, test_df = train_test_split(
         df,
         test_size=0.15,
@@ -134,15 +136,20 @@ def split_encode(df,name):
     print("Test:", test_df.shape)
 
     target_col = "price"
+
+    # Create 5 folds for out of fold encoding
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    ## Initialise placeholder column for out-of-fold location encoding.
+    # Create empty column to store encoded Location values
     train_val_df["location"] = 0.0
 
     # Global mean price
     global_mean = train_val_df[target_col].mean()
 
     # Out of fold encoding
+    # For each fold:
+    #   1. Compute average price per Location using fold training data
+    #   2. Map those averages to fold validation data
     for train_idx, val_idx in kf.split(train_val_df):
         fold_train = train_val_df.iloc[train_idx]
         fold_val = train_val_df.iloc[val_idx]
@@ -153,7 +160,8 @@ def split_encode(df,name):
             fold_val["Location"].map(location_means).fillna(global_mean)
         )
     
-    # Encode validation using full training data
+    # After cross validation encoding,
+    # recompute location means using all train_val data
     location_means_full = train_val_df.groupby("Location")[target_col].mean()
 
     train_val_df["location"] = (
@@ -167,8 +175,8 @@ def split_encode(df,name):
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    train_val_path = os.path.join(OUTPUT_DIR, f"{name}_train_val_preprocessed2.csv")
-    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed2.csv")
+    train_val_path = os.path.join(OUTPUT_DIR, f"{name}_train_val_preprocessed.csv")
+    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed.csv")
 
     train_val_df.to_csv(train_val_path, index=False)
     test_df.to_csv(test_path, index=False)
