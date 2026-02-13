@@ -122,48 +122,42 @@ def split_encode(df,name):
       - save resulting CSVs under processed_data/
     """
 
-    real_train_df, temp_df = train_test_split(
+    train_val_df, test_df = train_test_split(
         df,
-        test_size=0.3,
+        test_size=0.15,
         random_state=42,
         stratify=df["Location"]
     )
 
-    real_val_df, test_df = train_test_split(
-        temp_df,
-        test_size=0.5,
-        random_state=42,
-    )
 
-    print("Train:", real_train_df.shape)
-    print("Validation:", real_val_df.shape)
+    print("Train and val:", train_val_df.shape)
     print("Test:", test_df.shape)
 
     target_col = "price"
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
     ## Initialise placeholder column for out-of-fold location encoding.
-    real_train_df["location"] = 0.0
+    train_val_df["location"] = 0.0
 
     # Global mean price
-    global_mean = real_train_df[target_col].mean()
+    global_mean = train_val_df[target_col].mean()
 
     # Out of fold encoding
-    for train_idx, val_idx in kf.split(real_train_df):
-        fold_train = real_train_df.iloc[train_idx]
-        fold_val = real_train_df.iloc[val_idx]
+    for train_idx, val_idx in kf.split(train_val_df):
+        fold_train = train_val_df.iloc[train_idx]
+        fold_val = train_val_df.iloc[val_idx]
 
         location_means = fold_train.groupby("Location")[target_col].mean()
 
-        real_train_df.loc[fold_val.index, "location"] = (
+        train_val_df.loc[fold_val.index, "location"] = (
             fold_val["Location"].map(location_means).fillna(global_mean)
         )
     
     # Encode validation using full training data
-    location_means_full = real_train_df.groupby("Location")[target_col].mean()
+    location_means_full = train_val_df.groupby("Location")[target_col].mean()
 
-    real_val_df["location"] = (
-        real_val_df["Location"].map(location_means_full).fillna(global_mean)
+    train_val_df["location"] = (
+        train_val_df["Location"].map(location_means_full).fillna(global_mean)
     )
 
     test_df["location"] = (
@@ -173,16 +167,14 @@ def split_encode(df,name):
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed.csv")
-    val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed.csv")
-    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed.csv")
+    train_val_path = os.path.join(OUTPUT_DIR, f"{name}_train_val_preprocessed2.csv")
+    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed2.csv")
 
-    real_train_df.to_csv(train_path, index=False)
-    real_val_df.to_csv(val_path, index=False)
+    train_val_df.to_csv(train_val_path, index=False)
     test_df.to_csv(test_path, index=False)
 
-    print("Saved real training data to:", train_path)
-    print("Saved real validation data to:", val_path)
+    print("Saved real training data to:", train_val_path)
     print("Saved real test data to:", test_path)
 
 split_encode(real_df, "real")
+

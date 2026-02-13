@@ -499,14 +499,11 @@ def expand_records_real(row):
 
 def reno_cost_for_real_data(
     
-    # csv_path="processed_data/real_with_extracted_features_synonyms.csv",
-    # output_path="processed_data/real_with_predicted_reno_cost.csv"
+    csv_path="processed_data/real_train_val_with_extracted_features_synonyms.csv",
+    output_path="processed_data/real_train_val_with_predicted_reno_cost.csv"
     
-    # csv_path="processed_data/real_val_with_extracted_features_synonyms.csv",
-    # output_path="processed_data/real_val_with_predicted_reno_cost.csv"
-
-    csv_path="processed_data/real_test_with_extracted_features_synonyms.csv",
-    output_path="processed_data/real_test_with_predicted_reno_cost.csv"
+    # csv_path="processed_data/real_test_with_extracted_features_synonyms.csv",
+    # output_path="processed_data/real_test_with_predicted_reno_cost.csv"
     
 ):
     df = pd.read_csv(csv_path)

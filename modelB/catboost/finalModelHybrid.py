@@ -8,7 +8,7 @@ import random
 from sklearn.model_selection import KFold
 
 # -----------------------------
-# helpers
+# Helpers
 # -----------------------------
 def mape(y_true, y_pred):
     y_true = np.asarray(y_true, dtype=float)
@@ -16,8 +16,9 @@ def mape(y_true, y_pred):
     mask = y_true != 0
     return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
 
-
+# -----------------------------
 # Normalize material text into consistent format
+# -----------------------------
 def normalize_material(x):
     if pd.isna(x):
         return np.nan
@@ -29,11 +30,16 @@ def normalize_material(x):
         .replace(" ", "-")
     )
 
+# -----------------------------
 # Normalize renovation tokens
+# -----------------------------
 def normalize_token(x):
     return " ".join(x.lower().strip().split())
 
+# -----------------------------
 # Parse renovation type column into list format
+# Converts string or list string into list format
+# -----------------------------
 def parse_reno(value):
     if pd.isna(value):
         return []
@@ -105,7 +111,7 @@ def preprocess_real(df, require_target=False):
 
 
 # -----------------------------
-# load pretrained synthetic model
+# Load pretrained synthetic model
 # -----------------------------
 syn_model = CatBoostRegressor()
 syn_model.load_model("modelB/models/synthetic_catboost_best_model.cbm")
@@ -121,51 +127,12 @@ SYN_FEATURE_COLS = saved["feature_columns"]
 SYN_MODEL_PARAMS = saved["model_params"]
 
 # -----------------------------
-# prepare validation set for fine tuning
-# -----------------------------
-real_val = pd.read_csv("processed_data/real_val_with_predicted_reno_cost.csv")
-real_val = preprocess_real(real_val, require_target=True)
-
-# Use real price as target as price is the same as post renovation value
-real_val["post_renovation_value"] = real_val["price"]
-
-# Ensure all required synthetic features exist
-for col in set(SYN_FEATURE_COLS) - set(real_val.columns):
-    real_val[col] = 0
-
-X_val = real_val[SYN_FEATURE_COLS]
-y_val = real_val["post_renovation_value"]
-
-val_pool = Pool(
-    X_val,
-    y_val,
-    cat_features=[X_val.columns.get_loc("unit_type")]
-)
-
-# -----------------------------
-# Prepare real training set for fine tuning
-# -----------------------------
-real_train = pd.read_csv("processed_data/real_with_predicted_reno_cost.csv")
-real_train = preprocess_real(real_train, require_target=True)
-
-real_train["post_renovation_value"] = real_train["price"]
-
-for col in set(SYN_FEATURE_COLS) - set(real_train.columns):
-    real_train[col] = 0
-
-X_train = real_train[SYN_FEATURE_COLS]
-y_train = real_train["post_renovation_value"]
-
-train_pool = Pool(
-    X_train,
-    y_train,
-    cat_features=[X_train.columns.get_loc("unit_type")]
-)
-
-# -----------------------------
-# Combine real training and validation data for cross validation during tuning
+# Prepare train_val set for fine-tuning
 # ------------------------------
-dev_df = pd.concat([real_train, real_val], ignore_index=True)
+dev_df = pd.read_csv("processed_data/real_train_val_with_predicted_reno_cost.csv")
+
+dev_df = preprocess_real(dev_df, require_target=True)
+
 dev_df["post_renovation_value"] = dev_df["price"]
 
 for col in set(SYN_FEATURE_COLS) - set(dev_df.columns):
@@ -173,6 +140,12 @@ for col in set(SYN_FEATURE_COLS) - set(dev_df.columns):
 
 X_dev = dev_df[SYN_FEATURE_COLS]
 y_dev = dev_df["post_renovation_value"]
+
+train_pool = Pool(
+    X_dev,
+    y_dev,
+    cat_features=[X_dev.columns.get_loc("unit_type")]
+)
 
 # -----------------------------
 # tune with AAEO
@@ -424,5 +397,3 @@ test_mape = mape(y_test, test_preds)
 
 print("Loaded model R2 on real test:", r2)
 print("Loaded model MAPE on real test:", test_mape)
-
-
