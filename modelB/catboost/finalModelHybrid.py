@@ -5,6 +5,7 @@ import ast
 from catboost import CatBoostRegressor, Pool
 from sklearn.metrics import r2_score
 import random
+from sklearn.model_selection import KFold
 
 # -----------------------------
 # helpers
@@ -122,7 +123,7 @@ SYN_MODEL_PARAMS = saved["model_params"]
 # -----------------------------
 # prepare validation set for fine tuning
 # -----------------------------
-real_val = pd.read_csv("processed_data/real_val_with_predicted_reno_cost2.csv")
+real_val = pd.read_csv("processed_data/real_val_with_predicted_reno_cost.csv")
 real_val = preprocess_real(real_val, require_target=True)
 
 # Use real price as target as price is the same as post renovation value
@@ -144,7 +145,7 @@ val_pool = Pool(
 # -----------------------------
 # Prepare real training set for fine tuning
 # -----------------------------
-real_train = pd.read_csv("processed_data/real_with_predicted_reno_cost2.csv")
+real_train = pd.read_csv("processed_data/real_with_predicted_reno_cost.csv")
 real_train = preprocess_real(real_train, require_target=True)
 
 real_train["post_renovation_value"] = real_train["price"]
@@ -160,6 +161,18 @@ train_pool = Pool(
     y_train,
     cat_features=[X_train.columns.get_loc("unit_type")]
 )
+
+# -----------------------------
+# Combine real training and validation data for cross validation during tuning
+# ------------------------------
+dev_df = pd.concat([real_train, real_val], ignore_index=True)
+dev_df["post_renovation_value"] = dev_df["price"]
+
+for col in set(SYN_FEATURE_COLS) - set(dev_df.columns):
+    dev_df[col] = 0
+
+X_dev = dev_df[SYN_FEATURE_COLS]
+y_dev = dev_df["post_renovation_value"]
 
 # -----------------------------
 # tune with AAEO
@@ -180,38 +193,67 @@ def random_individual():
         "iterations": np.random.randint(*BOUNDS["iterations"] + (1,))
     }
 
-# Evaluate parameter set using R2 on validation
+# Evaluate parameter set by doing k-fold cross validation 
 def evaluate(individual):
     clean_params = {}
-
     for k, v in individual.items():
-        if isinstance(v, (np.ndarray, list)):
-            v = v.item()
-
         if k in ["depth", "iterations"]:
             clean_params[k] = int(v)
         else:
             clean_params[k] = float(v)
 
-    model = CatBoostRegressor(
-        loss_function="RMSE",
-        eval_metric="R2",
-        random_seed=42,
-        verbose=False,
-        **clean_params
-    )
+    # data set split into 5 folds 
+    # each fold is used once as validation while the other 4 form the training set
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    # Fine tune starting from synthetic model
-    model.fit(
-        train_pool,
-        eval_set=val_pool,
-        init_model=syn_model,
-        use_best_model=True,
-        early_stopping_rounds=100
-    )
+    fold_scores = []
 
-    preds = model.predict(val_pool)
-    return r2_score(y_val, preds)
+    for train_idx, val_idx in kf.split(X_dev):
+
+        X_tr = X_dev.iloc[train_idx]
+        y_tr = y_dev.iloc[train_idx]
+
+        X_va = X_dev.iloc[val_idx]
+        y_va = y_dev.iloc[val_idx]
+
+        # Training inside each fold
+        # Fine tunes on synthetic model 
+        train_pool = Pool(
+            X_tr,
+            y_tr,
+            cat_features=[X_tr.columns.get_loc("unit_type")]
+        )
+
+        val_pool = Pool(
+            X_va,
+            y_va,
+            cat_features=[X_va.columns.get_loc("unit_type")]
+        )
+
+        model = CatBoostRegressor(
+            loss_function="RMSE",
+            eval_metric="R2",
+            random_seed=42,
+            verbose=False,
+            **clean_params
+        )
+
+        #Early stopping used bc 
+        # if validation score does not improve for 100 consecutive rounds:
+        # Then training stop early to prevent overfitting and save time
+        model.fit(
+            train_pool,
+            eval_set=val_pool,
+            init_model=syn_model,
+            use_best_model=True,
+            early_stopping_rounds=100
+        )
+
+        # Computing R2 for this fold
+        preds = model.predict(val_pool)
+        fold_scores.append(r2_score(y_va, preds))
+
+    return np.mean(fold_scores)
 
 # Small evolutionary optimization loop to tune CatBoost hyperparameters.
 # Find the combination of learning_rate, depth, l2_leaf_reg, and iterations that maximizes R2 on the validation set.
@@ -219,10 +261,13 @@ def evaluate(individual):
 # Create 8 candidate parameter sets per generation.
 POP_SIZE = 8
 
-# Evolve them for 10 iterations.
+#Take the current 8 parameter sets.
+#Slightly modify them.
+#Test the new ones.
+#Keep the better ones.
 GENERATIONS = 10
 
-# You randomly generate 8 different hyperparameter combinations within predefined bounds.
+# Randomly generate 8 different parameter sets from BOUNDS
 population = [random_individual() for _ in range(POP_SIZE)]
 
 # Train a model for each parameter set and compute its R2 on validation data. That R2 is the fitness score.
@@ -332,30 +377,21 @@ finetuned_model = CatBoostRegressor(
     **best_params
 )
 
+final_pool = Pool(
+    X_dev,
+    y_dev,
+    cat_features=[X_dev.columns.get_loc("unit_type")]
+)
+
 finetuned_model.fit(
-    train_pool,
-    eval_set=val_pool,
-    init_model=syn_model,
-    use_best_model=True,
-    early_stopping_rounds=100
+    final_pool,
+    init_model=syn_model
 )
 
 
 
 #finetuned_model.save_model("modelB/models/synthetic_plus_real_catboost_model.cbm")
 
-# -----------------------------
-# Evaluate fine tuned model on real validation data
-# -----------------------------
-
-
-val_preds = finetuned_model.predict(val_pool)
-
-r2 = r2_score(y_val, val_preds)
-val_mape = mape(y_val, val_preds)
-
-print("Fine tuned model R2 on real validation:", r2)
-print("Fine tuned model MAPE on real validation:", val_mape)
 
 # -------------------------------------------
 # Load and run saved model on test data

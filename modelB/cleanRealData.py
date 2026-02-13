@@ -3,8 +3,6 @@ import pandas as pd
 from sklearn.model_selection import train_test_split,KFold
 import numpy as np
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import Ridge
 import spacy
 
 folder_path = "../../model_2_real_data_3"
@@ -111,39 +109,6 @@ X_train, X_val, y_train, y_val = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# Configures a TF–IDF vectoriser that:
-# ignores tokens seen in fewer than 5 documents (min_df=5),
-# uses unigrams and bigrams (ngram_range=(1,2)),
-# removes English stop words.
-tfidf = TfidfVectorizer(
-    min_df=5,
-    ngram_range=(1,2),
-    stop_words="english"
-)
-
-#Learns the TF–IDF vocabulary and IDF weights from the training text and converts training text to a sparse feature matrix.
-X_train_tfidf = tfidf.fit_transform(X_train)
-
-#Converts validation text to the same TF–IDF feature space (no refitting) to avoid data leakage.
-X_val_tfidf = tfidf.transform(X_val)
-
-# Train ridge regression on text features to measure how words in the property description relate to price.
-model = Ridge(alpha=1.0)
-model.fit(X_train_tfidf, y_train)
-
-# Inspect which words increase or decrease price
-feature_names = np.array(tfidf.get_feature_names_out())
-coefs = model.coef_
-
-top_pos = feature_names[np.argsort(coefs)[-30:]]
-top_neg = feature_names[np.argsort(coefs)[:30]]
-
-print("Top price increasing words:")
-print(top_pos)
-
-print("\nTop price decreasing words:")
-print(top_neg)
-
 # -----------------------------
 # Location target encoding
 # -----------------------------
@@ -168,7 +133,6 @@ def split_encode(df,name):
         temp_df,
         test_size=0.5,
         random_state=42,
-        stratify=df["Location"]
     )
 
     print("Train:", real_train_df.shape)
@@ -209,15 +173,16 @@ def split_encode(df,name):
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed2.csv")
-    val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed2.csv")
+    train_path = os.path.join(OUTPUT_DIR, f"{name}_train_preprocessed.csv")
+    val_path = os.path.join(OUTPUT_DIR, f"{name}_val_preprocessed.csv")
     test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed.csv")
 
     real_train_df.to_csv(train_path, index=False)
     real_val_df.to_csv(val_path, index=False)
+    test_df.to_csv(test_path, index=False)
 
     print("Saved real training data to:", train_path)
     print("Saved real validation data to:", val_path)
-    print("Saved real validation data to:", test_path)
+    print("Saved real test data to:", test_path)
 
 split_encode(real_df, "real")

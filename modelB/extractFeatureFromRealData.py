@@ -8,8 +8,8 @@ from model.featureEngineering import reno_cost_for_real_data
 # Load train or validation set
 # -----------------------------
 
-#df_real = pd.read_csv("processed_data/real_train_preprocessed2.csv")
-#df_real = pd.read_csv("processed_data/real_val_preprocessed2.csv")
+#df_real = pd.read_csv("processed_data/real_train_preprocessed.csv")
+#df_real = pd.read_csv("processed_data/real_val_preprocessed.csv")
 df_real = pd.read_csv("processed_data/real_test_preprocessed.csv")
 
 # add unique id per row
@@ -580,9 +580,8 @@ df_extracted[
     ]
 ].head(10)
 
-
-#df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms2.csv", index=False)
-#df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms2.csv", index=False)
+#df_extracted.to_csv("processed_data/real_with_extracted_features_synonyms.csv", index=False)
+#df_extracted.to_csv("processed_data/real_val_with_extracted_features_synonyms.csv", index=False)
 df_extracted.to_csv("processed_data/real_test_with_extracted_features_synonyms.csv", index=False)
 
 df_final = extract_reno_cost()
