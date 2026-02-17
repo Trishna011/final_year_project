@@ -73,6 +73,29 @@ model.fit(
     ]
 )
 
+#=========================
+# SAVE MODEL
+#=========================
+
+model_path = "modelB/models/lightGBM/lightgbm_synthetic_model.txt"
+model.booster_.save_model(model_path)
+
+print(f"Saved LightGBM synthetic model to {model_path}")
+
+# =========================
+# SAVE PARAMETERS + FEATURE COLUMNS
+# =========================
+
+params_path = "modelB/models/lightGBM/lightgbm_synthetic_best_params.json"
+
+params_to_save = {
+    "model_params": model.get_params(),
+    "feature_columns": list(X_train_enc.columns)
+}
+
+with open(params_path, "w") as f:
+    json.dump(params_to_save, f, indent=2)
+
 # =========================
 # PREDICT
 # =========================

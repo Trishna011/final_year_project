@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
+import joblib
+import json
 
 
 def mape(y_true, y_pred):
@@ -65,6 +67,29 @@ rf_model = RandomForestRegressor(
 )
 
 rf_model.fit(X_train_enc, y_train)
+
+# -------------------------
+# Save model
+# -------------------------
+model_path = "modelB/models/randomForest/randomforest_synthetic_model.pkl"
+joblib.dump(rf_model, model_path)
+
+print("Saved Random Forest model to:", model_path)
+
+# -------------------------
+# SAVE PARAMETERS + FEATURE COLUMNS
+# -------------------------
+
+params_path = "modelB/models/randomForest/randomforest_synthetic_best_params.json"
+
+params_to_save = {
+    "model_params": rf_model.get_params(),
+    "feature_columns": list(X_train_enc.columns)
+}
+
+with open(params_path, "w") as f:
+    json.dump(params_to_save, f, indent=2)
+
 
 # predict
 val_preds = rf_model.predict(X_val_enc)
