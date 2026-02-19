@@ -6,6 +6,7 @@ import pandas as pd
 
 NUM_SAMPLES = 8000
 OUTPUT_FILE = "synthetic_renovation_scenarios.csv"
+#OUTPUT_FILE = "test_synthetic_renovation_scenarios.csv"
 
 MATERIAL_GRADES = ["High-end", "Mid-range", "Budget-friendly"]
 
@@ -65,9 +66,6 @@ LOCATION_SIZE_RULES = {
     "Wigan": (3500, 4200)
 }
 
-# Simple helper to simulate binary Yes/No with probability p for "Yes".
-def yes_no(p):
-    return "Yes" if random.random() < p else "No"
 
 # Based on the rules implemented in the front end, these are the possible renovation scenarios we want to simulate.
 RENOVATION_SCENARIOS = [
@@ -173,6 +171,9 @@ def interpolate(val, low_x, high_x, low_y, high_y):
     return low_y + ratio * (high_y - low_y)
 
 def compute_sqft_to_add(room, property_size):
+    if random.random() < 0.76:
+        return 0
+    
     rules = EXTENSION_RULES.get(room, EXTENSION_RULES["other/custom"])
 
     for low_x, high_x, low_y, high_y in rules:
@@ -180,7 +181,7 @@ def compute_sqft_to_add(room, property_size):
             if high_x == float("inf"):
                 return high_y
             return interpolate(property_size, low_x, high_x, low_y, high_y)
-        return 0
+    return 0
     
 def compute_sqft_renovated_for_room(room, property_size):
     rules = RENOVATION_RULES.get(room, RENOVATION_RULES["other/custom"])
@@ -259,8 +260,15 @@ while len(rows) < NUM_SAMPLES:
 
     else:
         #num of bedrooms and bathrooms to renovate is based on property size
-        bedrooms = max(1, int(property_size / random.uniform(450, 600)))
-        bathrooms = max(1, int(bedrooms / random.uniform(1.0, 2.0)))
+        if "Bedroom" in renovation_type:
+            bedrooms = max(1, int(property_size / random.uniform(450, 600)))
+        else:
+            bedrooms = 0
+        
+        if "Bathroom" in renovation_type:    
+            bathrooms = max(1, int(bedrooms / random.uniform(1.0, 2.0)))
+        else:
+            bathrooms = 0
 
         #compute sqft renovated for each room based on property size just like real data
         sqft_renovated = {

@@ -175,8 +175,8 @@ def split_encode(df,name):
     OUTPUT_DIR = "processed_data"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    train_val_path = os.path.join(OUTPUT_DIR, f"{name}_train_val_preprocessed.csv")
-    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed.csv")
+    train_val_path = os.path.join(OUTPUT_DIR, f"{name}_train_val_preprocessed2.csv")
+    test_path = os.path.join(OUTPUT_DIR, f"{name}_test_preprocessed2.csv")
 
     train_val_df.to_csv(train_val_path, index=False)
     test_df.to_csv(test_path, index=False)

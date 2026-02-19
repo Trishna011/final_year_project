@@ -1,0 +1,70 @@
+id,property_size,Location,price,location,material_grade,extended_rooms,structural_changes,type_of_renovation,sqft_to_add,sqft_renovated,renovation_cost
+1,2987.0,Oldham,1750000.0,623197.5,high-end,other/custom,1,['other/custom'],602.0,450.0,42228.01
+2,1827.0,Withington,750000.0,769500.0,mid-range,,0,"['bathroom', 'bedroom']",0.0,472.0,39710.36
+3,1097.0,Bury,1200000.0,734499.75,high-end,,0,,0.0,0.0,0.0
+4,968.0,Withington,525000.0,769500.0,mid-range,"bedroom, other/custom",1,"['other/custom', 'bedroom']",294.7383177570093,333.66355140186914,22752.7
+5,2000.0,Stockport,475000.0,573999.7,high-end,,0,,0.0,0.0,0.0
+6,2109.0,Prestwich,725000.0,581941.6666666666,mid-range,,0,,0.0,0.0,0.0
+7,3919.0,Rochdale,999995.0,756694.75,high-end,other/custom,1,['other/custom'],301.0,450.0,42722.16
+8,1148.0,Rochdale,200000.0,756694.75,budget-friendly,,0,"['bathroom', 'living room', 'kitchen']",0.0,639.3286713286714,25400.92
+9,2582.0,Altrincham,1195000.0,1479696.6666666667,high-end,,0,['living room'],0.0,600.0,44127.34
+10,1228.0,Levenshulme,375000.0,380714.28571428574,mid-range,,0,,0.0,0.0,0.0
+11,1773.0,Ashton-under-lyne,550000.0,434184.375,mid-range,,0,,0.0,0.0,0.0
+12,5452.0,Wigan,800000.0,404750.0,high-end,other/custom,1,['other/custom'],301.0,450.0,42722.16
+13,3089.0,Bolton,1700000.0,856449.75,high-end,,0,"['living room', 'kitchen']",0.0,980.0,49105.11
+14,1377.0,Withington,575000.0,769500.0,mid-range,,0,full renovation,0.0,1377.0,49694.1
+15,2543.0,Sale,880000.0,699583.3333333334,high-end,,0,,0.0,0.0,0.0
+16,957.0,City Centre,240000.0,696157.8947368421,budget-friendly,,0,"['bathroom', 'living room', 'kitchen']",0.0,546.797507788162,22139.51
+17,1302.0,Salford,650000.0,533605.2631578947,mid-range,,0,"['bathroom', 'living room', 'bedroom']",0.0,671.083916083916,28462.1
+18,1344.0,Salford,650000.0,533605.2631578947,high-end,,0,,0.0,0.0,0.0
+19,2389.0,Tameside,775000.0,589700.0,budget-friendly,other/custom,1,['other/custom'],602.0,450.0,33981.68
+20,1355.0,Prestwich,380000.0,581941.6666666666,mid-range,,0,full renovation,0.0,1355.0,49694.1
+21,3605.0,Wigan,1050000.0,404750.0,high-end,other/custom,1,['other/custom'],602.0,450.0,42722.16
+22,1203.0,Salford,600000.0,533605.2631578947,mid-range,,0,,0.0,0.0,0.0
+23,101.0,Trafford,399950.0,1355070.85,mid-range,,0,,0.0,0.0,0.0
+24,1775.0,Chorlton,765000.0,853899.75,high-end,,0,,0.0,0.0,0.0
+25,2500.0,Wigan,895000.0,404750.0,high-end,,0,,0.0,0.0,0.0
+26,1022.0,Bolton,360000.0,856449.75,budget-friendly,,0,"['bathroom', 'kitchen']",0.0,291.8785046728972,23278.72
+27,1388.0,Didsbury,675000.0,804750.0,mid-range,"bedroom, kitchen, other/custom",1,"['other/custom', 'kitchen', 'bedroom']",671.06993006993,753.9673659673659,27727.76
+28,1054.0,Oldham,110000.0,623197.5,budget-friendly,,0,,0.0,0.0,0.0
+29,841.0,Sale,335000.0,699583.3333333334,budget-friendly,,0,"['living room', 'kitchen']",0.0,417.6323987538941,22139.51
+30,1507.0,Stretford,625000.0,534538.4615384615,budget-friendly,,0,,0.0,0.0,0.0
+31,1397.0,Cheadle,425000.0,730210.7142857143,high-end,,0,"['living room', 'kitchen']",0.0,645.6410256410256,33441.43
+32,2174.0,Trafford,675000.0,1355070.85,mid-range,,0,,0.0,0.0,0.0
+33,811.0,Prestwich,290000.0,581941.6666666666,budget-friendly,,0,,0.0,0.0,0.0
+34,2979.0,Bolton,980000.0,856449.75,high-end,,0,,0.0,0.0,0.0
+35,2174.0,Trafford,675000.0,1355070.85,mid-range,,0,,0.0,0.0,0.0
+36,712.0,Rochdale,210000.0,756694.75,budget-friendly,,0,"['bathroom', 'living room', 'kitchen']",0.0,437.20159151193633,22139.51
+37,905.0,Bury,270000.0,734499.75,budget-friendly,,0,['other/custom'],0.0,163.2429906542056,21754.32
+38,1514.0,Oldham,425000.0,623197.5,mid-range,,0,,0.0,0.0,0.0
+39,2141.0,Didsbury,1050000.0,804750.0,high-end,,0,,0.0,0.0,0.0
+40,1042.0,Bury,200000.0,734499.75,budget-friendly,,0,,0.0,0.0,0.0
+41,837.0,Stockport,320000.0,573999.7,budget-friendly,,0,,0.0,0.0,0.0
+42,6011.0,Altrincham,3250000.0,1479696.6666666667,high-end,other/custom,1,['other/custom'],301.0,450.0,42228.01
+43,943.0,Ashton-under-lyne,400000.0,434184.375,mid-range,other/custom,1,['other/custom'],133.5981308411215,171.41121495327104,22752.7
+44,2088.0,Stretford,600000.0,534538.4615384615,high-end,other/custom,1,['other/custom'],301.0,450.0,42722.16
+45,747.0,City Centre,300000.0,696157.8947368421,budget-friendly,other/custom,1,full renovation,215.20159151193633,747.0,33042.7
+46,1671.0,Sale,590000.0,699583.3333333334,budget-friendly,other/custom,1,['other/custom'],903.0,450.0,35389.42
+47,771.0,Levenshulme,190000.0,380714.28571428574,budget-friendly,"kitchen, other/custom",1,"['other/custom', 'kitchen']",275.73520249221184,298.13084112149534,22139.51
+48,2995.0,Chorlton,795000.0,853899.75,high-end,,0,,0.0,0.0,0.0
+49,1241.0,Altrincham,525000.0,1479696.6666666667,mid-range,,0,['kitchen'],0.0,236.5174825174825,26163.86
+50,11119.0,City Centre,1250000.0,696157.8947368421,high-end,"bedroom, other/custom",1,"['other/custom', 'bedroom']",924.0,772.0,42497.12
+51,1660.0,Chorlton,725000.0,853899.75,mid-range,bedroom,1,['bedroom'],322.0,322.0,39024.33
+52,2067.0,Stockport,735000.0,573999.7,high-end,,0,full renovation,0.0,2067.0,73802.73
+53,740.0,Stockport,260000.0,573999.7,budget-friendly,,0,full renovation,0.0,740.0,33042.7
+54,1656.0,Tameside,500000.0,589700.0,high-end,,0,"['living room', 'kitchen', 'bedroom']",0.0,1302.0,52573.45
+55,914.0,Levenshulme,300000.0,380714.28571428574,budget-friendly,,0,,0.0,0.0,0.0
+56,656.0,Didsbury,230000.0,804750.0,budget-friendly,,0,,0.0,0.0,0.0
+57,1862.0,Trafford,595000.0,1355070.85,mid-range,other/custom,1,['other/custom'],301.0,450.0,39024.33
+58,703.7,Oldham,229950.0,623197.5,budget-friendly,other/custom,1,"['other/custom', 'kitchen']",315.39429708222815,283.3289124668435,22139.51
+59,2500.0,Altrincham,1475000.0,1479696.6666666667,high-end,,0,"['living room', 'kitchen', 'bedroom']",0.0,1302.0,52573.45
+60,3181.0,Didsbury,1400000.0,804750.0,high-end,,0,,0.0,0.0,0.0
+61,823.0,Tameside,350000.0,589700.0,budget-friendly,,0,full renovation,0.0,823.0,32913.41
+62,1074.0,Wigan,275000.0,404750.0,budget-friendly,,0,,0.0,0.0,0.0
+63,2669.0,Rochdale,1500000.0,756694.75,high-end,,0,,0.0,0.0,0.0
+64,3150.0,Altrincham,1395000.0,1479696.6666666667,high-end,,0,"['living room', 'kitchen', 'bedroom']",0.0,1302.0,52573.45
+65,3111.0,Ashton-under-lyne,580000.0,434184.375,high-end,,0,,0.0,0.0,0.0
+66,1317.0,Cheadle,365000.0,730210.7142857143,high-end,,0,"['bathroom', 'living room', 'bedroom']",0.0,678.3216783216783,33963.86
+67,993.0,Tameside,375000.0,589700.0,high-end,,0,,0.0,0.0,0.0
+68,1835.0,City Centre,795000.0,696157.8947368421,high-end,,0,,0.0,0.0,0.0
+69,1032.0,Sale,500000.0,699583.3333333334,mid-range,,0,"['bathroom', 'living room', 'kitchen']",0.0,583.4797507788162,24209.98

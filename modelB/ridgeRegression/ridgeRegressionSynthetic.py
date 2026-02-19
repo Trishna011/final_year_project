@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
+import joblib
+import json
 
 # load synthetic data
 train_exp = pd.read_csv("processed_data/synthetic_train_expanded.csv")
@@ -47,6 +49,30 @@ X_val_enc = X_val_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 # train ridge regression
 ridge_model = Ridge(alpha=1.0)
 ridge_model.fit(X_train_enc, y_train)
+
+
+# -------------------------
+# Save model
+# -------------------------
+model_path = "modelB/models/ridgeRegression/ridge_synthetic_model.pkl"
+joblib.dump(ridge_model, model_path)
+
+print("Saved ridge regression model to:", model_path)
+
+# -------------------------
+# SAVE PARAMETERS + FEATURE COLUMNS
+# -------------------------
+
+params_path = "modelB/models/ridgeRegression/ridge_synthetic_best_params.json"
+
+params_to_save = {
+    "model_params": ridge_model.get_params(),
+    "feature_columns": list(X_train_enc.columns)
+}
+
+with open(params_path, "w") as f:
+    json.dump(params_to_save, f, indent=2)
+
 
 # predict
 val_preds = ridge_model.predict(X_val_enc)

@@ -1,0 +1,10 @@
+[
+  "property_size",
+  "location",
+  "renovation_cost",
+  "sqft_renovated",
+  "sqft_to_add",
+  "material_grade",
+  "structural_changes",
+  "renovation_type"
+]

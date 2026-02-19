@@ -1,0 +1,24 @@
+{
+  "model_params": {
+    "depth": 8,
+    "iterations": 1500,
+    "l2_leaf_reg": 7,
+    "learning_rate": 0.1
+  },
+  "feature_columns": [
+    "property_size",
+    "location",
+    "renovation_cost",
+    "sqft_renovated",
+    "sqft_to_add",
+    "material_grade",
+    "structural_change",
+    "unit_type",
+    "reno_bathroom",
+    "reno_bedroom",
+    "reno_kitchen",
+    "reno_living_room",
+    "reno_other_custom",
+    "reno_full_renovation"
+  ]
+}

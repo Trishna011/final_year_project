@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug extractFeatureFromRealData",
+            "type": "python",
+            "request": "launch",
+            "module": "modelB.extractFeatureFromRealData",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/venv/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

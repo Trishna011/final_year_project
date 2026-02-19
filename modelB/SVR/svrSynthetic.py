@@ -4,6 +4,10 @@ from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import r2_score
+import joblib
+import json
+from sklearn.model_selection import ParameterGrid, KFold
+from sklearn.pipeline import Pipeline
 
 
 # =========================
@@ -50,37 +54,105 @@ X_val_enc = pd.get_dummies(X_val, drop_first=True)
 
 X_val_enc = X_val_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
-# =========================
-# IMPUTE + SCALE
-# =========================
+# =========================================
+# BUILD PIPELINE
+# =========================================
 
-imputer = SimpleImputer(strategy="median")
-scaler = StandardScaler()
+pipeline = Pipeline([
+("imputer", SimpleImputer(strategy="median")),
+("scaler", StandardScaler()),
+("svr", SVR(kernel="rbf"))
+])
 
-X_train_imp = imputer.fit_transform(X_train_enc)
-X_val_imp = imputer.transform(X_val_enc)
+# =========================================
+# PARAMETER GRID
+# =========================================
 
-X_train_scaled = scaler.fit_transform(X_train_imp)
-X_val_scaled = scaler.transform(X_val_imp)
+param_grid = {
+"svr__C": [1, 10, 50, 100, 300],
+"svr__epsilon": [0.01, 0.1, 1],
+"svr__gamma": ["scale", 0.001, 0.01, 0.05]
+}
 
-# =========================
-# TRAIN SVR
-# =========================
+best_r2 = -np.inf
+best_params = None
+best_model = None
 
-svr_model = SVR(
-    kernel="rbf",
-    C=100,
-    epsilon=0.1,
-    gamma="scale"
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+for params in ParameterGrid(param_grid):
+
+    pipeline.set_params(**params)
+
+    fold_scores = []
+
+    for train_idx, val_idx in kf.split(X_train_enc):
+
+        X_tr = X_train_enc.iloc[train_idx]
+        y_tr = y_train.iloc[train_idx]
+
+        X_va = X_train_enc.iloc[val_idx]
+        y_va = y_train.iloc[val_idx]
+
+        pipeline.fit(X_tr, y_tr)
+        preds = pipeline.predict(X_va)
+
+        fold_scores.append(r2_score(y_va, preds))
+
+    mean_r2 = np.mean(fold_scores)
+
+    print("tested:", params, "R2:", mean_r2)
+
+    if mean_r2 > best_r2:
+        best_r2 = mean_r2
+        best_params = params
+        best_model = joblib.dump(pipeline)
+
+
+print("\nBest R2:", best_r2)
+print("Best params:", best_params)
+
+best_model.fit(X_train_enc, y_train)
+
+
+val_preds = best_model.predict(X_val_enc)
+
+pred_df = pd.DataFrame({
+"source_row": val_exp["source_row"].values,
+"y_true": y_val.values,
+"y_pred": val_preds
+})
+
+prop_level = pred_df.groupby("source_row", as_index=False).agg(
+y_true=("y_true", "first"),
+y_pred=("y_pred", "mean")
 )
 
-svr_model.fit(X_train_scaled, y_train)
+r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+print("Final R2:", r2)
+# -------------------------
+# Save model
+# -------------------------
+model_bundle = {
+"model": best_model,
+}
 
-# =========================
-# PREDICT
-# =========================
+model_path = "modelB/models/SVR/svr_synthetic_model.pkl"
+joblib.dump(model_bundle, model_path)
+# -------------------------
+# SAVE PARAMETERS + FEATURE COLUMNS
+# -------------------------
 
-val_preds = svr_model.predict(X_val_scaled)
+params_path = "modelB/models/SVR/ridge_synthetic_best_params.json"
+
+params_to_save = {
+    "model_params": best_model.get_params(),
+    "feature_columns": list(X_train_enc.columns)
+}
+
+with open(params_path, "w") as f:
+    json.dump(params_to_save, f, indent=2)
+
 
 # =========================
 # AGGREGATE TO PROPERTY LEVEL
