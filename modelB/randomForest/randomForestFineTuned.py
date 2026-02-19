@@ -183,228 +183,270 @@ print(X_dev.describe())
 #-----------------------------
 # tune randomForest with AAEO
 #-----------------------------
-BOUNDS = {
-    "max_features": (0.001, 0.04),
-    "max_depth": (4, 8),
-    "min_samples_leaf": (1, 15),
-    "n_estimators": (150, 600)
-}
+# BOUNDS = {
+#     "max_features": (0.001, 0.04),
+#     "max_depth": (4, 8),
+#     "min_samples_leaf": (1, 15),
+#     "n_estimators": (150, 600)
+# }
 
-# Random parameter generator
-def random_individual():
-    return {
-        "max_features": np.random.uniform(*BOUNDS["max_features"]),
-        "max_depth": np.random.randint(*BOUNDS["max_depth"] + (1,)),
-        "min_samples_leaf": np.random.uniform(*BOUNDS["min_samples_leaf"]),
-        "n_estimators": np.random.randint(*BOUNDS["n_estimators"] + (1,))
-    }
+# # Random parameter generator
+# def random_individual():
+#     return {
+#         "max_features": np.random.uniform(*BOUNDS["max_features"]),
+#         "max_depth": np.random.randint(*BOUNDS["max_depth"] + (1,)),
+#         "min_samples_leaf": np.random.uniform(*BOUNDS["min_samples_leaf"]),
+#         "n_estimators": np.random.randint(*BOUNDS["n_estimators"] + (1,))
+#     }
 
-# Evaluate parameter set by doing k-fold cross validation 
-def evaluate(individual):
-    clean_params = {}
+# # Evaluate parameter set by doing k-fold cross validation 
+# def evaluate(individual):
+#     clean_params = {}
     
-    clean_params = {
-        "n_estimators": int(individual["n_estimators"]),
-        "max_depth": int(individual["max_depth"]),
-        "min_samples_leaf": int(individual["min_samples_leaf"]),
-        "max_features": float(individual["max_features"]),
-    }   
+#     clean_params = {
+#         "n_estimators": int(individual["n_estimators"]),
+#         "max_depth": int(individual["max_depth"]),
+#         "min_samples_leaf": int(individual["min_samples_leaf"]),
+#         "max_features": float(individual["max_features"]),
+#     }   
     
-    # data set split into 5 folds 
-    # each fold is used once as validation while the other 4 form the training set
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     # data set split into 5 folds 
+#     # each fold is used once as validation while the other 4 form the training set
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    fold_scores = []
+#     fold_scores = []
 
-    for train_idx, val_idx in kf.split(X_dev):
+#     for train_idx, val_idx in kf.split(X_dev):
         
-        X_tr = X_dev.iloc[train_idx]
-        y_tr = y_dev.iloc[train_idx]
+#         X_tr = X_dev.iloc[train_idx]
+#         y_tr = y_dev.iloc[train_idx]
 
-        X_va = X_dev.iloc[val_idx]
-        y_va = y_dev.iloc[val_idx]
+#         X_va = X_dev.iloc[val_idx]
+#         y_va = y_dev.iloc[val_idx]
 
-        # 1. Load fresh synthetic model
-        base_model = joblib.load(
-            "modelB/models/randomForest/randomforest_synthetic_model.pkl"
-        )
+#         # 1. Load fresh synthetic model
+#         base_model = joblib.load(
+#             "modelB/models/randomForest/randomforest_synthetic_model.pkl"
+#         )
 
-        # 2. Enable warm start
-        base_model.set_params(warm_start=True)
+#         # 2. Enable warm start
+#         base_model.set_params(warm_start=True)
 
 
-        # 3. Apply structural params for NEW trees
-        base_model.set_params(
-            max_depth=clean_params["max_depth"],
-            min_samples_leaf=clean_params["min_samples_leaf"],
-            max_features=clean_params["max_features"],
-        )
+#         # 3. Apply structural params for NEW trees
+#         base_model.set_params(
+#             max_depth=clean_params["max_depth"],
+#             min_samples_leaf=clean_params["min_samples_leaf"],
+#             max_features=clean_params["max_features"],
+#         )
 
-        # 4. Increase number of trees incrementially to mimic early stopping
-        original_trees = base_model.n_estimators
-        max_additional = clean_params["max_additional_trees"]
+#         # 4. Increase number of trees incrementially in 50's to mimic early stopping
+#         original_trees = base_model.n_estimators
+#         max_additional = clean_params["n_estimators"]
 
-        step = 50
-        best_score = -np.inf
-        current_trees = original_trees
+#         step = 50
+#         best_score = -np.inf
+#         current_trees = original_trees
 
-        while current_trees < original_trees + max_additional:
-            current_trees += step
-            base_model.set_params(n_estimators=current_trees)
-            base_model.fit(X_tr, y_tr)
+#         while current_trees < original_trees + max_additional:
+#             current_trees += step
+#             base_model.set_params(n_estimators=current_trees)
+#             base_model.fit(X_tr, y_tr)
 
-            preds = base_model.predict(X_va)
-            score = r2_score(y_va, preds)
+#             preds = base_model.predict(X_va)
+#             score = r2_score(y_va, preds)
 
-            if score > best_score:
-                best_score = score
-            else:
-                break
+#             if score > best_score:
+#                 best_score = score
+#             else:
+#                 break
         
-        fold_scores.append(best_score)
+#         fold_scores.append(best_score)
 
-    return np.mean(fold_scores)
-
-# -----------------------------
-# EVOLUTIONARY SEARCH
-# -----------------------------
-POP_SIZE = 8
-GENERATIONS = 10
-
-# Randomly generate 8 different parameter sets from BOUNDS
-population = [random_individual() for _ in range(POP_SIZE)]
-
-# Train a model for each parameter set and compute its R2 on validation data. That R2 is the fitness score.
-fitness = [evaluate(ind) for ind in population]
-
-# Find which candidate performs best.
-best_idx = np.argmax(fitness)
-best_individual = population[best_idx]
-best_score = fitness[best_idx]
-
-print("Initial best R2:", best_score)
-
-for gen in range(GENERATIONS):
-    print(f"\nGeneration {gen + 1}")
-
-    # For each generation:
-    # Create new candidates
-    new_population = []
-    
-    for i, ind in enumerate(population):
-
-        # For each current individual:
-        # With 50 percent probability:
-        if random.random() < 0.5:
-
-            # You combine it with another random candidate.
-            partner = population[np.random.randint(POP_SIZE)]
-
-            # new_value = current + random factor × difference from partner
-            # This is exploration using direction between two solutions.
-            new_ind = {
-                k: ind[k] + np.random.uniform(-0.2, 0.2) * (partner[k] - ind[k])
-                for k in ind
-            }
-        # Otherwise slightly perturb each parameter randomly.    
-        else:
-            new_ind = {
-                k: ind[k] + np.random.uniform(-0.1, 0.1)
-                for k in ind
-            }
-
-        # Force each parameter to remain within allowed limits using np.clip.
-        # This prevents invalid values.
-        new_ind["n_estimators"] = int(
-            np.clip(new_ind["n_estimators"], *BOUNDS["n_estimators"])
-        )
-
-        new_ind["max_depth"] = int(
-            np.clip(new_ind["max_depth"], *BOUNDS["max_depth"])
-        )
-
-        new_ind["min_samples_leaf"] = int(
-            np.clip(new_ind["min_samples_leaf"], *BOUNDS["min_samples_leaf"])
-        )
-
-        new_ind["max_features"] = float(
-            np.clip(new_ind["max_features"], *BOUNDS["max_features"])
-        )
-
-        new_population.append(new_ind)
-
-    # Train a model for each new parameter set and compute R2.
-    new_fitness = [evaluate(ind) for ind in new_population]
-
-    # Replace old population with new population if fitness improves.
-    for i in range(POP_SIZE):
-        if new_fitness[i] > fitness[i]:
-            population[i] = new_population[i]
-            fitness[i] = new_fitness[i]
-
-    # Track best performing candidate across all generations.
-    gen_best_idx = np.argmax(fitness)
-    if fitness[gen_best_idx] > best_score:
-        best_score = fitness[gen_best_idx]
-        best_individual = population[gen_best_idx]
-
-    print("Best R2 so far:", best_score)
-
-    # Save best parameters found
-    best_params = {
-        "max_features": float(best_individual["max_features"]),
-        "max_depth": int(best_individual["max_depth"]),
-        "min_samples_leaf": int(best_individual["min_samples_leaf"]),
-        "n_estimators": int(best_individual["n_estimators"])
-        }
-    
-best_params_path = "modelB/models/lightGBM/finetuned_best_params_lightGBM_AAEO.json"
-with open(best_params_path, "w") as f:
-    json.dump(best_params, f, indent=2)
+#     return np.mean(fold_scores)
 
 # # -----------------------------
-# # Train final fine tuned model using best parameters
+# # EVOLUTIONARY SEARCH
 # # -----------------------------
+# POP_SIZE = 8
+# GENERATIONS = 10
 
-# with open("modelB/models/lightGBM/finetuned_best_params_lightGBM_AAEO.json", "r") as f:
+# # Randomly generate 8 different parameter sets from BOUNDS
+# population = [random_individual() for _ in range(POP_SIZE)]
+
+# # Train a model for each parameter set and compute its R2 on validation data. That R2 is the fitness score.
+# fitness = [evaluate(ind) for ind in population]
+
+# # Find which candidate performs best.
+# best_idx = np.argmax(fitness)
+# best_individual = population[best_idx]
+# best_score = fitness[best_idx]
+
+# print("Initial best R2:", best_score)
+
+# for gen in range(GENERATIONS):
+#     print(f"\nGeneration {gen + 1}")
+
+#     # For each generation:
+#     # Create new candidates
+#     new_population = []
+    
+#     for i, ind in enumerate(population):
+
+#         # For each current individual:
+#         # With 50 percent probability:
+#         if random.random() < 0.5:
+
+#             # You combine it with another random candidate.
+#             partner = population[np.random.randint(POP_SIZE)]
+
+#             # new_value = current + random factor × difference from partner
+#             # This is exploration using direction between two solutions.
+#             new_ind = {
+#                 k: ind[k] + np.random.uniform(-0.2, 0.2) * (partner[k] - ind[k])
+#                 for k in ind
+#             }
+#         # Otherwise slightly perturb each parameter randomly.    
+#         else:
+#             new_ind = {
+#                 k: ind[k] + np.random.uniform(-0.1, 0.1)
+#                 for k in ind
+#             }
+
+#         # Force each parameter to remain within allowed limits using np.clip.
+#         # This prevents invalid values.
+#         new_ind["n_estimators"] = int(
+#             np.clip(new_ind["n_estimators"], *BOUNDS["n_estimators"])
+#         )
+
+#         new_ind["max_depth"] = int(
+#             np.clip(new_ind["max_depth"], *BOUNDS["max_depth"])
+#         )
+
+#         new_ind["min_samples_leaf"] = int(
+#             np.clip(new_ind["min_samples_leaf"], *BOUNDS["min_samples_leaf"])
+#         )
+
+#         new_ind["max_features"] = float(
+#             np.clip(new_ind["max_features"], *BOUNDS["max_features"])
+#         )
+
+#         new_population.append(new_ind)
+
+#     # Train a model for each new parameter set and compute R2.
+#     new_fitness = [evaluate(ind) for ind in new_population]
+
+#     # Replace old population with new population if fitness improves.
+#     for i in range(POP_SIZE):
+#         if new_fitness[i] > fitness[i]:
+#             population[i] = new_population[i]
+#             fitness[i] = new_fitness[i]
+
+#     # Track best performing candidate across all generations.
+#     gen_best_idx = np.argmax(fitness)
+#     if fitness[gen_best_idx] > best_score:
+#         best_score = fitness[gen_best_idx]
+#         best_individual = population[gen_best_idx]
+
+#     print("Best R2 so far:", best_score)
+
+#     # Save best parameters found
+#     best_params = {
+#         "max_features": float(best_individual["max_features"]),
+#         "max_depth": int(best_individual["max_depth"]),
+#         "min_samples_leaf": int(best_individual["min_samples_leaf"]),
+#         "n_estimators": int(best_individual["n_estimators"])
+#         }
+    
+# best_params_path = "modelB/models/randomForest/finetuned_best_params_randomForest_AAEO.json"
+# with open(best_params_path, "w") as f:
+#     json.dump(best_params, f, indent=2)
+
+
+# with open("modelB/models/randomForest/finetuned_best_params_randomForest_AAEO.json", "r") as f:
 #     best_params = json.load(f)
 
+# # -------------------------
+# # Load synthetic base model
+# # -------------------------
 
-# joblib.dump(finetuned_model, "modelB/models/randomForest/synthetic_plus_real_rf.pkl")
+# final_model = joblib.load(
+#     "modelB/models/randomForest/randomforest_synthetic_model.pkl"
+# )
+
+# # -------------------------
+# # Enable warm start
+# # -------------------------
+
+# final_model.set_params(warm_start=True)
+
+# # -------------------------
+# # Apply structural parameters
+# # -------------------------
+
+# final_model.set_params(
+#     max_depth=int(best_params["max_depth"]),
+#     min_samples_leaf=int(best_params["min_samples_leaf"]),
+#     max_features=float(best_params["max_features"]),
+# )
+
+# # -------------------------
+# #Grow additional trees on full dev data
+# # -------------------------
+
+# original_trees = final_model.n_estimators
+# additional_trees = int(best_params["n_estimators"])
+
+# final_model.set_params(
+#     n_estimators=original_trees + additional_trees
+# )
+
+# final_model.fit(X_dev, y_dev)
+
+# # -------------------------
+# # Save trained fine tuned model
+# # -------------------------
+
+# model_path = "modelB/models/randomForest/synthetic_plus_real_rf.pkl"
+# joblib.dump(final_model, model_path)
+
+# print("Saved fine tuned model to:", model_path)
+
+# -------------------------------------------
+# Load and run saved model on test data
+# -------------------------------------------
+with open("modelB/models/randomForest/finetuned_best_params_randomForest_AAEO.json", "r") as f:
+    best_params = json.load(f)
+
+loaded_model = joblib.load("modelB/models/randomForest/synthetic_plus_real_rf.pkl")
 
 
-# # -------------------------------------------
-# # Load and run saved model on test data
-# # -------------------------------------------
-# loaded_model = joblib.load("modelB/models/randomForest/synthetic_plus_real_rf.pkl")
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+real_test = preprocess_real(real_test, require_target=True)
 
+X_test_raw = real_test[raw_feature_list]
 
-# #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-# real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-# real_test = preprocess_real(real_test, require_target=True)
+X_test_enc = pd.get_dummies(X_test_raw, drop_first=True)
 
-# X_test_raw = real_test[raw_feature_list]
+X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
 
-# X_test_enc = pd.get_dummies(X_test_raw, drop_first=True)
+X_test = X_test_enc
+y_test = real_test["post_renovation_value"]
 
-# X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
+test_preds = loaded_model.predict(X_test)
 
-# X_test = X_test_enc
-# y_test = real_test["post_renovation_value"]
+r2 = r2_score(y_test, test_preds)
+test_mape = mape(y_test, test_preds)
 
-# test_preds = loaded_model.predict(X_test)
+print("Loaded model R2 on real test:", r2)
+print("Loaded model MAPE on real test:", test_mape)
 
-# r2 = r2_score(y_test, test_preds)
-# test_mape = mape(y_test, test_preds)
+# Save predictions
+preds_df = pd.DataFrame({
+    "y_true": y_test.values,
+    "y_pred": test_preds
+})
 
-# print("Loaded model R2 on real test:", r2)
-# print("Loaded model MAPE on real test:", test_mape)
-
-# # Save predictions
-# preds_df = pd.DataFrame({
-#     "y_true": y_test.values,
-#     "y_pred": test_preds
-# })
-
-# preds_path = "modelB/lightGBM/lightgbm_synthetic_test_predictions.csv"
-# preds_df.to_csv(preds_path, index=False)
+preds_path = "modelB/randomForest/randomForest_synthetic_test_predictions.csv"
+preds_df.to_csv(preds_path, index=False)

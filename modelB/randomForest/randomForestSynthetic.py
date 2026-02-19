@@ -105,7 +105,7 @@ prop_level = pred_df.groupby("source_row", as_index=False).agg(
     y_true=("y_true", "first"),
     y_pred=("y_pred", "mean")
 )
-
+ 
 # metrics
 r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
 val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
