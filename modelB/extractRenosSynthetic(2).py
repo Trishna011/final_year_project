@@ -1,6 +1,10 @@
 import pandas as pd
 import ast
 
+# This script takes the cleaned synthetic data and expands it so that each row corresponds to a single renovated unit (e.g. one bedroom, one bathroom, etc.) rather than a whole renovation project. 
+# This allows us to train a model that can predict the value uplift from renovating specific units, which is more granular and actionable for users.
+# Which is the same as what is done in model 1
+
 def expand_df(input_path, output_path):
 
     # load the dataframe
@@ -17,7 +21,6 @@ def expand_df(input_path, output_path):
     )
 
     #expand renovations
-
     output_rows = []
 
     for src_idx, r in df.iterrows():
@@ -120,4 +123,10 @@ expand_df(
 expand_df(
     "processed_data/synthetic_val_preprocessed.csv",
     "processed_data/synthetic_val_expanded.csv",
+)
+
+# expand test
+expand_df(
+    "processed_data/synthetic_test_preprocessed.csv",
+    "processed_data/synthetic_test_expanded.csv",
 )

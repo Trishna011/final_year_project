@@ -8,18 +8,25 @@ import json
 from mlxtend.plotting import heatmap
 import os
 import ast
+from pathlib import Path
 
 # -----------------------------
-# Load synthetic renovation dataset from hugging face
+# Load synthetic renovation dataset from hugging face and test set from local csv
 # -----------------------------
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR
+test_set = PROJECT_ROOT.parent / "test_synthetic_renovation_scenarios_with_pre_cost.csv"
 
 dataset = load_dataset("Trish101/reno_details_dataset", split="train")
+test_dataset = pd.read_csv(test_set)
 
 # Convert to pandas DataFrame
 df = dataset.to_pandas()
+test_df = dataset.to_pandas()
 
 #get rid of duplicate rows
 df = df.drop_duplicates()
+test_df = test_df.drop_duplicates()
 print("After removing duplicates:", df.shape)
 
 
@@ -42,25 +49,34 @@ def extract_sqft(value):
     return np.nan
 
 # Remove logically invalid or economically impossible rows
-df = df[
-    (df["property_size"] > 0) &
-    (df["pre_renovation_cost"] > 0) &
-    (df["renovation_cost"] >= 0) &
-    (df["renovation_cost"] <= df["pre_renovation_cost"] * 2)
-]
 
-# Bedrooms and bathrooms must:
-# - Be non negative
-# - Be whole numbers
-# - Not exceed 10
-df = df[
-    (df["bedrooms_to_reno"] >= 0) &
-    (df["bedrooms_to_reno"] % 1 == 0) &
-    (df["bedrooms_to_reno"] <= 10) &
-    (df["bathrooms_to_reno"] >= 0) &
-    (df["bathrooms_to_reno"] % 1 == 0) &
-    (df["bathrooms_to_reno"] <= 10)
-]
+def remove_invalid_rows(df):
+    df = df[
+        (df["property_size"] > 0) &
+        (df["pre_renovation_cost"] > 0) &
+        (df["renovation_cost"] >= 0) &
+        (df["renovation_cost"] <= df["pre_renovation_cost"] * 2)
+    ]
+    return df
+df = remove_invalid_rows(df)
+test_df = remove_invalid_rows(test_df)
+
+def remove_invaid_bath_bed(df):
+    # Bedrooms and bathrooms must:
+    # - Be non negative
+    # - Be whole numbers
+    # - Not exceed 10
+    df = df[
+        (df["bedrooms_to_reno"] >= 0) &
+        (df["bedrooms_to_reno"] % 1 == 0) &
+        (df["bedrooms_to_reno"] <= 10) &
+        (df["bathrooms_to_reno"] >= 0) &
+        (df["bathrooms_to_reno"] % 1 == 0) &
+        (df["bathrooms_to_reno"] <= 10)
+    ]
+    return df
+df = remove_invaid_bath_bed(df)
+test_df = remove_invaid_bath_bed(test_df)
 
 # -----------------------------
 # Outlier detection using IQR - only for visualisation purposes
@@ -106,6 +122,9 @@ sns.boxplot(data=df[cols_with_outliers])
 plt.xticks(rotation=45)
 #plt.show()
 
+# -------------------------------
+# Encode categorical features
+# -------------------------------
 
 # ordinal encode material_grade
 grade_map = {
@@ -180,16 +199,32 @@ def compute_material_multiplier(value):
 
 
 renovation_uplift = df.apply(compute_renovation_uplift, axis=1)
+renovation_uplift_test = test_df.apply(compute_renovation_uplift, axis=1)
+
 material_multiplier = df["material_grade"].apply(compute_material_multiplier)
+material_multiplier_test = test_df["material_grade"].apply(compute_material_multiplier)
 
 # measures how large the renovation is relative to the house value, then limits its influence for realism and stability.
 cost_ratio = (
     df["renovation_cost"] / df["pre_renovation_cost"]
 ).clip(upper=0.5)
 
+cost_ratio_test = (
+    test_df["renovation_cost"] / test_df["pre_renovation_cost"]
+).clip(upper=0.5)
+
 # Estimate post renovation value for synthetic data
 df["post_renovation_value"] = (
     df["pre_renovation_cost"]
+    * (
+        1
+        + renovation_uplift
+        + 0.3 * cost_ratio * material_multiplier
+    )
+)
+
+test_df["post_renovation_value"] = (
+    test_df["pre_renovation_cost"]
     * (
         1
         + renovation_uplift
@@ -235,12 +270,15 @@ def encode_structural_changes_lists(value):
 train_df["structural_changes"] = train_df["structural_changes"].apply(encode_structural_changes_lists)
 val_df["structural_changes"] = val_df["structural_changes"].apply(encode_structural_changes_lists)
 
+#for test set
+test_df["structural_changes"] = test_df["structural_changes"].apply(encode_structural_changes_lists)
+
 # target encoding on the location feature using KFold to prevent leakage.
 target_col = "post_renovation_value"
 
 kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-train_df["location"] = 0.0
+train_df["location_te"] = 0.0
 global_mean = train_df[target_col].mean()
 
 for train_idx, val_idx in kf.split(train_df):
@@ -249,16 +287,33 @@ for train_idx, val_idx in kf.split(train_df):
 
     location_means = fold_train.groupby("location")[target_col].mean()
 
-    train_df.loc[fold_val.index, "location"] = (
+    train_df.loc[fold_val.index, "location_te"] = (
         fold_val["location"].map(location_means).fillna(global_mean)
     )
 
 # fit final mapping on full training set
 location_means_full = train_df.groupby("location")[target_col].mean()
 
-val_df["location"] = (
+val_df["location_te"] = (
     val_df["location"].map(location_means_full).fillna(global_mean)
 )
+
+# for test set
+test_df["location_te"] = (
+    test_df["location"].map(location_means_full).fillna(global_mean)
+)
+
+train_df = train_df.drop(columns=["location"])
+val_df = val_df.drop(columns=["location"])
+test_df = test_df.drop(columns=["location"])
+
+train_df["location"] = train_df["location_te"]
+val_df["location"] = val_df["location_te"]
+test_df["location"] = test_df["location_te"]
+
+train_df = train_df.drop(columns=["location_te"])
+val_df = val_df.drop(columns=["location_te"])
+test_df = test_df.drop(columns=["location_te"])
 
 # Encode each item in the material grade list
 def encode_material_grade_lists(value):
@@ -302,6 +357,7 @@ def encode_material_grade_lists(value):
 
 train_df["material_grade"] = train_df["material_grade"].apply(encode_material_grade_lists)
 val_df["material_grade"] = val_df["material_grade"].apply(encode_material_grade_lists)
+test_df["material_grade"] = test_df["material_grade"].apply(encode_material_grade_lists)
 
 # one hot encode renovation_type for now
 # replace dynamic category discovery with a fixed, complete schema
@@ -318,11 +374,15 @@ for t in fixed_types:
     col_name = f"reno_{t.lower().replace(' ', '_').replace('/', '_')}"
     train_df[col_name] = train_df["renovation_type"].apply(lambda x: int(t in x))
     val_df[col_name] = val_df["renovation_type"].apply(lambda x: int(t in x))
+    test_df[col_name] = test_df["renovation_type"].apply(lambda x: int(t in x))
+    
 
 train_df, val_df = train_df.align(val_df, join="left", axis=1, fill_value=0)
+test_df = test_df.reindex(columns=train_df.columns, fill_value=0)
 
 train_df = train_df.drop(columns=["renovation_type"])
 val_df = val_df.drop(columns=["renovation_type"])
+test_df = test_df.drop(columns=["renovation_type"])
 
 
 # create output folders
@@ -340,10 +400,12 @@ def to_json_safe(x):
 for col in ["structural_changes", "material_grade"]:
     train_df[col] = train_df[col].apply(to_json_safe)
     val_df[col] = val_df[col].apply(to_json_safe)
+    test_df[col] = test_df[col].apply(to_json_safe)
 
 # save processed datasets
 train_path = os.path.join("processed_data", "synthetic_train_preprocessed.csv")
 val_path = os.path.join("processed_data", "synthetic_val_preprocessed.csv")
+test_path = os.path.join("processed_data", "synthetic_test_preprocessed.csv")
 
 
 #save feature columns to use for user inputs
@@ -358,6 +420,8 @@ with open(
 
 train_df.to_csv(train_path, index=False)
 val_df.to_csv(val_path, index=False)
+test_df.to_csv(test_path, index=False)
 
 print("Saved train data to:", train_path)
 print("Saved validation data to:", val_path)
+print("Saved test data to:", test_path)
