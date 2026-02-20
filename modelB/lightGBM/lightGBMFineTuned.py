@@ -3,17 +3,19 @@ import pandas as pd
 import ast
 import json
 from sklearn.metrics import r2_score
-from lightgbm import LGBMRegressor, Booster, early_stopping
+from lightgbm import early_stopping, log_evaluation, LGBMRegressor, Booster
 import random
 from sklearn.model_selection import KFold
 
 
+# -----------------------------
+# Helpers
+# -----------------------------
 def mape(y_true, y_pred):
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     mask = y_true != 0
     return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-
 
 # -----------------------------
 # Normalize material text into consistent format
@@ -104,7 +106,7 @@ def preprocess_real(df, require_target=False):
 
         # Drop unused columns
         df = df.drop(
-            columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id"],
+            columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id", "extended_rooms"],
             errors="ignore"
         )
 
@@ -129,7 +131,7 @@ def preprocess_real(df, require_target=False):
 # -----------------------------
 # Load pretrained synthetic model
 # -----------------------------
-syn_model = Booster(model_file="modelB/models/lightGBM/lightgbm_synthetic_model.txt")
+syn_model = Booster(model_file="modelB/models/lightGBM/lightgbm_synthetic_best_model.txt")
 
 # -----------------------------
 # Load saved feature schema and model parameters
@@ -142,80 +144,71 @@ SYN_FEATURE_COLS = saved["feature_columns"]
 SYN_MODEL_PARAMS = saved["model_params"]
 
 # -----------------------------
-# Prepare train_val set for fine-tuning
-# ------------------------------
+# Prepare real dev set
+# -----------------------------
 dev_df = pd.read_csv("processed_data/real_train_val_with_predicted_reno_cost.csv")
-
 dev_df = preprocess_real(dev_df, require_target=True)
-
 
 dev_df["post_renovation_value"] = dev_df["price"]
 
 raw_feature_list = [
-"property_size",
-"location",
-"renovation_cost",
-"sqft_renovated",
-"sqft_to_add",
-"material_grade",
-"structural_changes",
-"unit_type",
-"reno_bathroom",
-"reno_bedroom",
-"reno_kitchen",
-"reno_living_room",
-"reno_other_custom",
-"reno_full_renovation"
+    "property_size",
+    "location",
+    "renovation_cost",
+    "sqft_renovated",
+    "sqft_to_add",
+    "material_grade",
+    "structural_changes",
+    "unit_type",
+    "reno_bathroom",
+    "reno_bedroom",
+    "reno_kitchen",
+    "reno_living_room",
+    "reno_other_custom",
+    "reno_full_renovation"
 ]
 
 X_dev_raw = dev_df[raw_feature_list]
-
 X_dev_enc = pd.get_dummies(X_dev_raw, drop_first=True)
-
 X_dev_enc = X_dev_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
 
 X_dev = X_dev_enc
 y_dev = dev_df["post_renovation_value"]
-print(X_dev.describe())
 
 # -----------------------------
-# tune LightGBM with AAEO
+# AAEO-style tuning for LightGBM
 # -----------------------------
 # BOUNDS = {
 #     "learning_rate": (0.001, 0.04),
 #     "max_depth": (4, 8),
-#     "lambda_l2": (1, 15),
+#     "num_leaves": (20, 80),
 #     "n_estimators": (150, 600)
 # }
 
-# # Random parameter generator
 # def random_individual():
 #     return {
 #         "learning_rate": np.random.uniform(*BOUNDS["learning_rate"]),
-#         "max_depth": np.random.randint(*BOUNDS["max_depth"] + (1,)),
-#         "lambda_l2": np.random.uniform(*BOUNDS["lambda_l2"]),
-#         "n_estimators": np.random.randint(*BOUNDS["n_estimators"] + (1,))
+#         "max_depth": np.random.randint(BOUNDS["max_depth"][0], BOUNDS["max_depth"][1] + 1),
+#         "num_leaves": np.random.randint(BOUNDS["num_leaves"][0], BOUNDS["num_leaves"][1] + 1),
+#         "n_estimators": np.random.randint(BOUNDS["n_estimators"][0], BOUNDS["n_estimators"][1] + 1)
 #     }
 
-# # Evaluate parameter set by doing k-fold cross validation 
 # def evaluate(individual):
-#     clean_params = {}
-    
+
 #     clean_params = {
 #         "learning_rate": float(individual["learning_rate"]),
 #         "max_depth": int(individual["max_depth"]),
-#         "lambda_l2": float(individual["lambda_l2"]),
-#         "n_estimators": int(individual["n_estimators"])
+#         "num_leaves": int(individual["num_leaves"]),
+#         "n_estimators": int(individual["n_estimators"]),
+#         "objective": "regression",
+#         "random_state": 42
 #     }
-    
-#     # data set split into 5 folds 
-#     # each fold is used once as validation while the other 4 form the training set
-#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 #     fold_scores = []
 
 #     for train_idx, val_idx in kf.split(X_dev):
-        
+
 #         X_tr = X_dev.iloc[train_idx]
 #         y_tr = y_dev.iloc[train_idx]
 
@@ -228,11 +221,12 @@ print(X_dev.describe())
 #             X_tr,
 #             y_tr,
 #             eval_set=[(X_va, y_va)],
+#             eval_metric="rmse",
 #             init_model=syn_model,
-#             eval_metric="l2",
 #             callbacks=[
-#                 early_stopping(100)
-#             ]   
+#                 early_stopping(100),
+#                 log_evaluation(0)
+#             ]
 #         )
 
 #         preds = model.predict(X_va)
@@ -240,19 +234,12 @@ print(X_dev.describe())
 
 #     return np.mean(fold_scores)
 
-# # -----------------------------
-# # EVOLUTIONARY SEARCH
-# # -----------------------------
 # POP_SIZE = 8
 # GENERATIONS = 10
 
-# # Randomly generate 8 different parameter sets from BOUNDS
 # population = [random_individual() for _ in range(POP_SIZE)]
-
-# # Train a model for each parameter set and compute its R2 on validation data. That R2 is the fitness score.
 # fitness = [evaluate(ind) for ind in population]
 
-# # Find which candidate performs best.
 # best_idx = np.argmax(fitness)
 # best_individual = population[best_idx]
 # best_score = fitness[best_idx]
@@ -260,36 +247,24 @@ print(X_dev.describe())
 # print("Initial best R2:", best_score)
 
 # for gen in range(GENERATIONS):
-#     print(f"\nGeneration {gen + 1}")
 
-#     # For each generation:
-#     # Create new candidates
+#     print("Generation", gen + 1)
 #     new_population = []
-    
-#     for i, ind in enumerate(population):
 
-#         # For each current individual:
-#         # With 50 percent probability:
+#     for ind in population:
+
 #         if random.random() < 0.5:
-
-#             # You combine it with another random candidate.
 #             partner = population[np.random.randint(POP_SIZE)]
-
-#             # new_value = current + random factor × difference from partner
-#             # This is exploration using direction between two solutions.
 #             new_ind = {
 #                 k: ind[k] + np.random.uniform(-0.2, 0.2) * (partner[k] - ind[k])
 #                 for k in ind
 #             }
-#         # Otherwise slightly perturb each parameter randomly.    
 #         else:
 #             new_ind = {
 #                 k: ind[k] + np.random.uniform(-0.1, 0.1)
 #                 for k in ind
 #             }
 
-#         # Force each parameter to remain within allowed limits using np.clip.
-#         # This prevents invalid values.
 #         new_ind["learning_rate"] = float(
 #             np.clip(new_ind["learning_rate"], *BOUNDS["learning_rate"])
 #         )
@@ -298,8 +273,8 @@ print(X_dev.describe())
 #             np.clip(new_ind["max_depth"], *BOUNDS["max_depth"])
 #         )
 
-#         new_ind["lambda_l2"] = float(
-#             np.clip(new_ind["lambda_l2"], *BOUNDS["lambda_l2"])
+#         new_ind["num_leaves"] = int(
+#             np.clip(new_ind["num_leaves"], *BOUNDS["num_leaves"])
 #         )
 
 #         new_ind["n_estimators"] = int(
@@ -308,16 +283,13 @@ print(X_dev.describe())
 
 #         new_population.append(new_ind)
 
-#     # Train a model for each new parameter set and compute R2.
 #     new_fitness = [evaluate(ind) for ind in new_population]
 
-#     # Replace old population with new population if fitness improves.
 #     for i in range(POP_SIZE):
 #         if new_fitness[i] > fitness[i]:
 #             population[i] = new_population[i]
 #             fitness[i] = new_fitness[i]
 
-#     # Track best performing candidate across all generations.
 #     gen_best_idx = np.argmax(fitness)
 #     if fitness[gen_best_idx] > best_score:
 #         best_score = fitness[gen_best_idx]
@@ -325,72 +297,73 @@ print(X_dev.describe())
 
 #     print("Best R2 so far:", best_score)
 
-#     # Save best parameters found
-#     best_params = {
-#         "learning_rate": float(best_individual["learning_rate"]),
-#         "max_depth": int(best_individual["max_depth"]),
-#         "lambda_l2": float(best_individual["lambda_l2"]),
-#         "n_estimators": int(best_individual["n_estimators"])
-#         }
-    
-# best_params_path = "modelB/models/lightGBM/finetuned_best_params_lightGBM_AAEO.json"
-# with open(best_params_path, "w") as f:
+# best_params = {
+#     "learning_rate": float(best_individual["learning_rate"]),
+#     "max_depth": int(best_individual["max_depth"]),
+#     "num_leaves": int(best_individual["num_leaves"]),
+#     "n_estimators": int(best_individual["n_estimators"])
+# }
+
+# with open("modelB/models/lightGBM/finetuned_best_params_AAEO.json", "w") as f:
 #     json.dump(best_params, f, indent=2)
 
-# # -----------------------------
-# # Train final fine tuned model using best parameters
-# # -----------------------------
-
-# with open("modelB/models/lightGBM/finetuned_best_params_lightGBM_AAEO.json", "r") as f:
-#     best_params = json.load(f)
-
-# finetuned_model = LGBMRegressor(
+# # -------------------------------------------------------
+# # Train final fine tuned LightGBM model
+# # -------------------------------------------------------
+# final_model = LGBMRegressor(
+#     objective="regression",
 #     random_state=42,
 #     **best_params
 # )
 
-
-# finetuned_model.fit(
+# final_model.fit(
 #     X_dev,
 #     y_dev,
-#     init_model=syn_model,
-#     eval_metric="l2"
+#     init_model=syn_model
 # )
 
-# finetuned_model.booster_.save_model("modelB/models/lightGBM/synthetic_plus_real_lightGBM_model.txt")
+# final_model.booster_.save_model(
+#     "modelB/models/lightGBM/synthetic_plus_real_lightgbm_model.txt"
+# )
 
-# -------------------------------------------
-# Load and run saved model on test data
-# -------------------------------------------
-loaded_model = Booster(model_file = "modelB/models/lightGBM/synthetic_plus_real_lightGBM_model.txt")
+# -------------------------------------------------------
+# Load and evaluate on test data
+# -------------------------------------------------------
+loaded_booster = Booster(
+    model_file="modelB/models/lightGBM/synthetic_plus_real_lightgbm_model.txt"
+)
 
-
-#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 real_test = preprocess_real(real_test, require_target=True)
 
 X_test_raw = real_test[raw_feature_list]
-
 X_test_enc = pd.get_dummies(X_test_raw, drop_first=True)
-
 X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
 
 X_test = X_test_enc
 y_test = real_test["post_renovation_value"]
 
-test_preds = loaded_model.predict(X_test)
+test_preds = loaded_booster.predict(X_test)
 
 r2 = r2_score(y_test, test_preds)
+
+def mape(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    mask = y_true != 0
+    return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+
 test_mape = mape(y_test, test_preds)
 
-print("Loaded model R2 on real test:", r2)
-print("Loaded model MAPE on real test:", test_mape)
+print("Loaded LightGBM R2 on test:", r2)
+print("Loaded LightGBM MAPE on test:", test_mape)
 
-# Save predictions
 preds_df = pd.DataFrame({
     "y_true": y_test.values,
     "y_pred": test_preds
 })
 
-preds_path = "modelB/lightGBM/lightgbm_synthetic_test_predictions.csv"
-preds_df.to_csv(preds_path, index=False)
+preds_df.to_csv(
+    "modelB/lightGBM/lightgbm_synthetic_test_predictions.csv",
+    index=False
+)

@@ -5,11 +5,21 @@ from sklearn.metrics import r2_score
 import joblib
 import json
 
+def mape(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+
+    mask = y_true != 0
+    if mask.sum() == 0:
+        return np.nan
+
+    return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+
+
 # load synthetic data
 train_exp = pd.read_csv("processed_data/synthetic_train_expanded.csv")
 val_exp = pd.read_csv("processed_data/synthetic_val_expanded.csv")
 
-# target and features
 target = "post_renovation_value"
 
 features = [
@@ -39,14 +49,17 @@ y_train = train_exp[target]
 X_val = val_exp[features]
 y_val = val_exp[target]
 
-# one hot encode categorical features
+# one hot encode categoricals
 X_train_enc = pd.get_dummies(X_train, drop_first=True)
 X_val_enc = pd.get_dummies(X_val, drop_first=True)
 
 # align columns
 X_val_enc = X_val_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
+# ------------------------
 # train ridge regression
+# ------------------------
+
 ridge_model = Ridge(alpha=1.0)
 ridge_model.fit(X_train_enc, y_train)
 
