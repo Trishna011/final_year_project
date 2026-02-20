@@ -4,6 +4,8 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 import joblib
 import json
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 def mape(y_true, y_pred):
     y_true = np.asarray(y_true, dtype=float)
@@ -56,19 +58,22 @@ X_val_enc = pd.get_dummies(X_val, drop_first=True)
 # align columns
 X_val_enc = X_val_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
-# ------------------------
-# train ridge regression
-# ------------------------
+# ============================
+# PIPELINE WITH SCALING
+# ============================
 
-ridge_model = Ridge(alpha=1.0)
-ridge_model.fit(X_train_enc, y_train)
+ridge_pipeline = Pipeline([
+    ("scaler", StandardScaler()),
+    ("ridge", Ridge(alpha=1.0))
+])
 
+ridge_pipeline.fit(X_train_enc, y_train)
 
 # -------------------------
 # Save model
 # -------------------------
 model_path = "modelB/models/ridgeRegression/ridge_synthetic_model.pkl"
-joblib.dump(ridge_model, model_path)
+joblib.dump(ridge_pipeline, model_path)
 
 print("Saved ridge regression model to:", model_path)
 
@@ -79,7 +84,7 @@ print("Saved ridge regression model to:", model_path)
 params_path = "modelB/models/ridgeRegression/ridge_synthetic_best_params.json"
 
 params_to_save = {
-    "model_params": ridge_model.get_params(),
+    "ridge_params": ridge_pipeline.named_steps["ridge"].get_params(),
     "feature_columns": list(X_train_enc.columns)
 }
 
@@ -88,7 +93,7 @@ with open(params_path, "w") as f:
 
 
 # predict
-val_preds = ridge_model.predict(X_val_enc)
+val_preds = ridge_pipeline.predict(X_val_enc)
 
 # build prediction dataframe
 pred_df = pd.DataFrame({

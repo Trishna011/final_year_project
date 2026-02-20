@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 import ast
-from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import SGDRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold
-from sklearn.impute import SimpleImputer
 import joblib
 import random
 import json
@@ -106,7 +107,7 @@ def preprocess_real(df, require_target=False):
 
         # Drop unused columns
         df = df.drop(
-            columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id"],
+            columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id", "extended_rooms"],
             errors="ignore"
         )
 
@@ -130,7 +131,15 @@ def preprocess_real(df, require_target=False):
 # -----------------------------
 # Load pretrained synthetic model
 # -----------------------------
-syn_model = joblib.load("modelB/models/ridgeRegression/ridge_synthetic_model.pkl")
+syn_model = joblib.load(
+"modelB/models/ridgeRegression/ridge_synthetic_model.pkl"
+)
+
+scaler = syn_model.named_steps["scaler"]
+ridge_model = syn_model.named_steps["ridge"]
+
+w_syn = ridge_model.coef_
+b_syn = ridge_model.intercept_
 
 # -----------------------------
 # Load saved feature schema and model parameters
@@ -140,11 +149,12 @@ with open("modelB/models/ridgeRegression/ridge_synthetic_best_params.json", "r")
     saved = json.load(f)
 
 SYN_FEATURE_COLS = saved["feature_columns"]
-SYN_MODEL_PARAMS = saved["model_params"]
+SYN_MODEL_PARAMS = saved["ridge_params"]
 
 # -----------------------------
 # Prepare train_val set for fine-tuning
 # ------------------------------
+
 dev_df = pd.read_csv("processed_data/real_train_val_with_predicted_reno_cost.csv")
 
 dev_df = preprocess_real(dev_df, require_target=True)
@@ -179,141 +189,173 @@ X_dev = X_dev_enc
 y_dev = dev_df["post_renovation_value"]
 print(X_dev.describe())
 
-from sklearn.linear_model import Ridge
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 
 # -----------------------------
 # Tune Ridge with AAEO
 # -----------------------------
-BOUNDS = {
-    "alpha": (0.0001, 100.0)
-}
+# BOUNDS = {
+#     "alpha": (1e-6, 10.0),
+#     "eta0": (1e-5, 0.1)
+# }
 
-# Random parameter generator
-def random_individual():
-    return {
-        "alpha": np.random.uniform(*BOUNDS["alpha"])
-    }
+# # Random parameter generator
+# def random_individual():
+#     return {
+#     "alpha": 10 ** np.random.uniform(-6, 1),
+#     "eta0": 10 ** np.random.uniform(-5, -1)
+# }
 
-# Evaluate parameter set using 5 fold CV
-def evaluate(individual):
+# # Evaluate parameter set using 5 fold CV
+# def evaluate(individual):
+#     alpha = float(individual["alpha"])
+#     eta0 = float(individual["eta0"])
 
-    clean_params = {
-        "alpha": float(individual["alpha"])
-    }
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     scores = []
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    fold_scores = []
+#     for train_idx, val_idx in kf.split(X_dev):
 
-    for train_idx, val_idx in kf.split(X_dev):
+#         X_tr_raw = X_dev.iloc[train_idx].values
+#         y_tr = y_dev.iloc[train_idx].values
+#         X_va_raw = X_dev.iloc[val_idx].values
+#         y_va = y_dev.iloc[val_idx].values
 
-        X_tr = X_dev.iloc[train_idx]
-        y_tr = y_dev.iloc[train_idx]
+#         X_tr = scaler.transform(X_tr_raw)
+#         X_va = scaler.transform(X_va_raw)
 
-        X_va = X_dev.iloc[val_idx]
-        y_va = y_dev.iloc[val_idx]
 
-        model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("ridge", Ridge(**clean_params))
-        ])
+#         model = SGDRegressor(
+#             penalty="l2",
+#             alpha=alpha,
+#             learning_rate="constant",
+#             eta0=eta0,
+#             max_iter=1,
+#             warm_start=True,
+#             random_state=42
+#         )
 
-        model.fit(X_tr, y_tr)
-        preds = model.predict(X_va)
+#         # initialize
+#         model.partial_fit(X_tr[:1], y_tr[:1])
+#         model.coef_ = w_syn.copy()
+#         model.intercept_ = np.array([b_syn])
 
-        fold_scores.append(r2_score(y_va, preds))
+#         # fine tune on real fold
+#         for _ in range(10):
+#             model.partial_fit(X_tr, y_tr)
 
-    return np.mean(fold_scores)
+#         preds = model.predict(X_va)
+#         scores.append(r2_score(y_va, preds))
 
-# -----------------------------
-# Evolutionary Search
-# -----------------------------
-POP_SIZE = 8
-GENERATIONS = 10
+#     return np.mean(scores)
 
-population = [random_individual() for _ in range(POP_SIZE)]
-fitness = [evaluate(ind) for ind in population]
 
-best_idx = np.argmax(fitness)
-best_individual = population[best_idx]
-best_score = fitness[best_idx]
 
-print("Initial best R2:", best_score)
+# # -----------------------------
+# # Evolutionary Search
+# # -----------------------------
+# POP_SIZE = 8
+# GENERATIONS = 10
 
-for gen in range(GENERATIONS):
-    print("\nGeneration", gen + 1)
+# population = [random_individual() for _ in range(POP_SIZE)]
+# fitness = [evaluate(ind) for ind in population]
 
-    new_population = []
+# best_idx = np.argmax(fitness)
+# best_individual = population[best_idx]
+# best_score = fitness[best_idx]
 
-    for i, ind in enumerate(population):
+# print("Initial best R2:", best_score)
 
-        if random.random() < 0.5:
-            partner = population[np.random.randint(POP_SIZE)]
-            new_ind = {
-                "alpha": ind["alpha"] + np.random.uniform(-0.2, 0.2) * (partner["alpha"] - ind["alpha"])
-            }
-        else:
-            new_ind = {
-                "alpha": ind["alpha"] + np.random.uniform(-0.1, 0.1)
-            }
+# for gen in range(GENERATIONS):
+#     print("\nGeneration", gen + 1)
 
-        new_ind["alpha"] = float(
-            np.clip(new_ind["alpha"], *BOUNDS["alpha"])
-        )
+#     new_population = []
 
-        new_population.append(new_ind)
+#     for i, ind in enumerate(population):
 
-    new_fitness = [evaluate(ind) for ind in new_population]
+#         if random.random() < 0.5:
+#             partner = population[np.random.randint(POP_SIZE)]
+#             new_ind = {
+#             "alpha": ind["alpha"] + np.random.uniform(-0.2, 0.2) * (partner["alpha"] - ind["alpha"]),
+#             "eta0": ind["eta0"] + np.random.uniform(-0.2, 0.2) * (partner["eta0"] - ind["eta0"])
+#             }
+#         else:
+#             new_ind = {
+#             "alpha": ind["alpha"] + np.random.uniform(-0.1, 0.1),
+#             "eta0": ind["eta0"] + np.random.uniform(-0.1, 0.1)
+#             }
 
-    for i in range(POP_SIZE):
-        if new_fitness[i] > fitness[i]:
-            population[i] = new_population[i]
-            fitness[i] = new_fitness[i]
+#         new_ind["alpha"] = float(np.clip(new_ind["alpha"], *BOUNDS["alpha"]))
+#         new_ind["eta0"] = float(np.clip(new_ind["eta0"], *BOUNDS["eta0"]))
+        
+#         new_population.append(new_ind)
 
-    gen_best_idx = np.argmax(fitness)
-    if fitness[gen_best_idx] > best_score:
-        best_score = fitness[gen_best_idx]
-        best_individual = population[gen_best_idx]
+#     new_fitness = [evaluate(ind) for ind in new_population]
 
-    print("Best R2 so far:", best_score)
+#     for i in range(POP_SIZE):
+#         if new_fitness[i] > fitness[i]:
+#             population[i] = new_population[i]
+#             fitness[i] = new_fitness[i]
 
-best_params = {
-    "alpha": float(best_individual["alpha"])
-}
+#     gen_best_idx = np.argmax(fitness)
+#     if fitness[gen_best_idx] > best_score:
+#         best_score = fitness[gen_best_idx]
+#         best_individual = population[gen_best_idx]
 
-best_params_path = "modelB/models/ridgeRegression/finetuned_best_params_ridge.json"
+#     print("Best R2 so far:", best_score)
 
-with open(best_params_path, "w") as f:
-    json.dump(best_params, f, indent=2)
+# best_params = {
+#     "alpha": float(best_individual["alpha"]),
+#     "eta0": float(best_individual["eta0"])
+# }
 
-print("Saved best Ridge params:", best_params)
+# best_params_path = "modelB/models/ridgeRegression/finetuned_best_params_ridge.json"
 
-# -----------------------------
-# Train final fine tuned model using best parameters
-# -----------------------------
+# with open(best_params_path, "w") as f:
+#     json.dump(best_params, f, indent=2)
 
-with open("modelB/models/ridgeRegression/finetuned_best_params_ridge.json", "r") as f:
-    best_params = json.load(f)
+# print("Saved best Ridge params:", best_params)
 
-finetuned_model = Ridge(
-alpha=best_params["alpha"],
-random_state=42
-)
+# # -----------------------------
+# # Train final fine tuned model using best parameters
+# # -----------------------------
 
-finetuned_model.fit(X_dev, y_dev)
+# with open("modelB/models/ridgeRegression/finetuned_best_params_ridge.json", "r") as f:
+#     best_params = json.load(f)
 
-joblib.dump(finetuned_model,"modelB/models/ridgeRegression/synthetic_plus_real_ridge.pkl")
+# final_model = SGDRegressor(
+#     penalty="l2",
+#     alpha=best_params["alpha"],
+#     learning_rate="constant",
+#     eta0=best_params["eta0"],
+#     max_iter=1,
+#     warm_start=True,
+#     random_state=42
+# )
+
+# X_dev_scaled = scaler.transform(X_dev.values)
+
+# final_model.partial_fit(X_dev_scaled[:1], y_dev.values[:1])
+# final_model.coef_ = w_syn.copy()
+# final_model.intercept_ = np.array([b_syn])
+
+# for _ in range(20):
+#     final_model.partial_fit(X_dev_scaled, y_dev.values)
+
+# joblib.dump(final_model, "modelB/models/ridgeRegression/synthetic_plus_real_sgd.pkl")
 
 # -------------------------------------------
 # Load and run saved model on test data
 # -------------------------------------------
-loaded_model = joblib.load("modelB/models/ridgeRegression/synthetic_plus_real_ridge.pkl")
+with open("modelB/models/ridgeRegression/finetuned_best_params_ridge.json", "r") as f:
+    best_params = json.load(f)
+
+loaded_model = joblib.load("modelB/models/ridgeRegression/synthetic_plus_real_sgd.pkl")
 
 
 #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 real_test = preprocess_real(real_test, require_target=True)
+
 
 X_test_raw = real_test[raw_feature_list]
 
@@ -324,7 +366,8 @@ X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
 X_test = X_test_enc
 y_test = real_test["post_renovation_value"]
 
-test_preds = loaded_model.predict(X_test)
+X_test_scaled = scaler.transform(X_test.values)
+test_preds = loaded_model.predict(X_test_scaled)
 
 r2 = r2_score(y_test, test_preds)
 test_mape = mape(y_test, test_preds)
@@ -338,5 +381,5 @@ preds_df = pd.DataFrame({
     "y_pred": test_preds
 })
 
-preds_path = "modelB/ridgeRegression/ridge_synthetic_test_predictions.csv"
+preds_path = "modelB/randomForest/randomForest_synthetic_test_predictions.csv"
 preds_df.to_csv(preds_path, index=False)
