@@ -103,13 +103,13 @@ def preprocess_real(df, require_target=False):
 
         df["post_renovation_value"] = df["price"]
 
+        # structural_change naming consistency
+        if "structural_changes" in df.columns:
+            df["structural_change"] = df["structural_changes"].astype(int)
+
     else:
         # Ensure correct types
         df["material_grade"] = df["material_grade"].astype(float)
-
-        # structural_change naming consistency
-        if "structural_change" in df.columns:
-            df["structural_changes"] = df["structural_change"].astype(int)
 
         df = df.drop(
             columns=["source_row"],
@@ -150,7 +150,7 @@ raw_feature_list = [
 "sqft_renovated",
 "sqft_to_add",
 "material_grade",
-"structural_changes",
+"structural_change",
 "reno_bathroom",
 "reno_bedroom",
 "reno_kitchen",
@@ -163,7 +163,7 @@ X_dev_raw = dev_df[raw_feature_list]
 
 X_dev_enc = pd.get_dummies(X_dev_raw, drop_first=True)
 
-X_dev_enc = X_dev_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
+X_dev_enc = X_dev_enc.reindex(columns=SYN_FEATURE_COLS)
 
 X_dev = X_dev_enc
 y_dev = dev_df["post_renovation_value"]
@@ -429,7 +429,7 @@ X_test_raw = real_test[raw_feature_list]
 
 X_test_enc = pd.get_dummies(X_test_raw, drop_first=True)
 
-X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
+X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS)
 
 X_test = X_test_enc
 y_test = real_test["post_renovation_value"]
