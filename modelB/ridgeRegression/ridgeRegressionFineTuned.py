@@ -174,7 +174,7 @@ X_dev_raw = dev_df[raw_feature_list]
 
 X_dev_enc = pd.get_dummies(X_dev_raw, drop_first=True)
 
-X_dev_enc = X_dev_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
+X_dev_enc = X_dev_enc.reindex(columns=SYN_FEATURE_COLS)
 
 X_dev = X_dev_enc
 y_dev = dev_df["post_renovation_value"]
