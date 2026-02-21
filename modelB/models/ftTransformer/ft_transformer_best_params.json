@@ -1,0 +1,25 @@
+{
+  "best_r2": 0.9685767889022827,
+  "best_params": {
+    "d_model": 256,
+    "dropout": 0.1,
+    "learning_rate": 0.001,
+    "n_layers": 2,
+    "weight_decay": 0.0005
+  },
+  "numeric_cols": [
+    "property_size",
+    "renovation_cost",
+    "sqft_renovated",
+    "sqft_to_add",
+    "material_grade",
+    "structural_change",
+    "reno_bathroom",
+    "reno_bedroom",
+    "reno_kitchen",
+    "reno_living_room",
+    "reno_other_custom",
+    "reno_full_renovation",
+    "location"
+  ]
+}
