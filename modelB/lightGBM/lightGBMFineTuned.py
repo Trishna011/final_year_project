@@ -4,6 +4,7 @@ import ast
 import json
 from sklearn.metrics import r2_score
 from lightgbm import early_stopping, log_evaluation, LGBMRegressor, Booster
+import joblib
 import random
 from sklearn.model_selection import KFold
 
@@ -39,7 +40,7 @@ def normalize_token(x):
 
 # -----------------------------
 # Parse renovation type column into list format
-# Converts string or list string into list format
+# Convert renovation type column into a list.
 # -----------------------------
 def parse_reno(value):
     if pd.isna(value):
@@ -80,7 +81,7 @@ def preprocess_real(df, require_target=False):
         # Parse renovation types into structured form
         df["type_of_renovation_parsed"] = df["type_of_renovation"].apply(parse_reno)
 
-        # Create one hot features for renovation types
+        # Create multi label binary encoding for renovation types
         fixed_types = {
             "bathroom": "bathroom",
             "bedroom": "bedroom",
@@ -90,19 +91,14 @@ def preprocess_real(df, require_target=False):
             "full renovation": "full_renovation"
         }
 
+        # initialize all to 0
         for suffix in fixed_types.values():
             df[f"reno_{suffix}"] = 0
 
+        # set 1 if renovation type exists
         for key, suffix in fixed_types.items():
             df[f"reno_{suffix}"] = df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
 
-        # Select first renovation type as categorical feature
-        def choose_unit_type(lst):
-            if not lst:
-                return "unknown"
-            return lst[0]
-
-        df["unit_type"] = df["type_of_renovation_parsed"].apply(choose_unit_type)
 
         # Drop unused columns
         df = df.drop(
@@ -115,7 +111,6 @@ def preprocess_real(df, require_target=False):
     else:
         # Ensure correct types
         df["material_grade"] = df["material_grade"].astype(float)
-        df["unit_type"] = df["unit_type"].astype(str)
 
         # structural_change naming consistency
         if "structural_change" in df.columns:
@@ -131,7 +126,7 @@ def preprocess_real(df, require_target=False):
 # -----------------------------
 # Load pretrained synthetic model
 # -----------------------------
-syn_model = Booster(model_file="modelB/models/lightGBM/lightgbm_synthetic_best_model.txt")
+syn_model = joblib.load("modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
 
 # -----------------------------
 # Load saved feature schema and model parameters
@@ -159,7 +154,6 @@ raw_feature_list = [
     "sqft_to_add",
     "material_grade",
     "structural_changes",
-    "unit_type",
     "reno_bathroom",
     "reno_bedroom",
     "reno_kitchen",
@@ -334,6 +328,7 @@ loaded_booster = Booster(
 )
 
 real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = preprocess_real(real_test, require_target=True)
 
 X_test_raw = real_test[raw_feature_list]
@@ -364,6 +359,6 @@ preds_df = pd.DataFrame({
 })
 
 preds_df.to_csv(
-    "modelB/lightGBM/lightgbm_synthetic_test_predictions.csv",
+    "modelB/lightGBM/lightgbm_finetuned_synthetic_predictions.csv",
     index=False
 )
