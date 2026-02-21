@@ -50,11 +50,6 @@ def preprocess_real_data(df):
     df["material_grade"] = df["material_grade"].map(material_map).fillna(1)
 
     # --------------------------------------------------
-    # 3. Create unit_type default
-    # --------------------------------------------------
-    df["unit_type"] = "house"
-
-    # --------------------------------------------------
     # 4. Create renovation flags from type_of_renovation
     # --------------------------------------------------
     def parse_flags(val):
@@ -124,7 +119,6 @@ def preprocess_real_data(df):
         "sqft_to_add",
         "material_grade",
         "structural_change",
-        "unit_type",
         "reno_bathroom",
         "reno_bedroom",
         "reno_kitchen",
@@ -139,6 +133,10 @@ def preprocess_real_data(df):
 # Define target and feature columns
 # Target is synthetic post renovation value
 # -------------------------------------------------------
+for df in [train_exp, val_exp, test_exp]:
+    if "unit_type" in df.columns:
+        df.drop(columns=["unit_type"], inplace=True)
+
 target = "post_renovation_value"
 
 features = [
@@ -149,7 +147,6 @@ features = [
     "sqft_to_add",
     "material_grade",
     "structural_change",
-    "unit_type",
     "reno_bathroom",
     "reno_bedroom",
     "reno_kitchen",
@@ -165,29 +162,15 @@ test_exp = test_exp.dropna(subset=[target])
 
 # Split features and target
 X_train = train_exp[features]
-X_train = train_exp[features].copy()
-X_train["unit_type"] = X_train["unit_type"].astype("category")
 
 y_train = train_exp[target]
 
 X_val = val_exp[features]
-X_val = val_exp[features].copy()
-X_val["unit_type"] = X_val["unit_type"].astype("category")
 
 y_val = val_exp[target]
 
 X_test = test_exp[features]
 y_test = test_exp[target]
-
-# -------------------------------------------------------
-# Convert categorical columns to category dtype
-# -------------------------------------------------------
-categorical_cols = ["unit_type"]
-
-for col in categorical_cols:
-    X_train[col] = X_train[col].astype("category")
-    X_val[col] = X_val[col].astype("category")
-    X_test["unit_type"] = X_test["unit_type"].astype("category")
 
 
 # -------------------------------------------------------
@@ -214,7 +197,6 @@ for params in ParameterGrid(param_grid):
     model = LGBMRegressor(
         objective="regression",
         random_state=42,
-        categorical_feature=["unit_type"],
         **params
     )
 
@@ -318,17 +300,6 @@ X_real = preprocess_real_data(real_test).copy()
 # Ensure same column order
 X_real = X_real[features]
 
-# Convert to category
-X_real["unit_type"] = X_real["unit_type"].astype("category")
-
-# Align categories with training
-X_real["unit_type"] = pd.Categorical(
-    X_real["unit_type"],
-    categories=X_train["unit_type"].cat.categories
-)
-
-print("Dtypes:")
-print(X_real.dtypes)
 
 # Predict
 preds = model.predict(X_real)
