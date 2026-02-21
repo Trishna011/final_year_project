@@ -5,6 +5,11 @@
   "sqft_renovated",
   "sqft_to_add",
   "material_grade",
-  "structural_changes",
-  "renovation_type"
+  "structural_change",
+  "reno_bathroom",
+  "reno_bedroom",
+  "reno_kitchen",
+  "reno_living_room",
+  "reno_other_custom",
+  "reno_full_renovation"
 ]

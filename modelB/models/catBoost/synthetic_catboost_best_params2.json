@@ -2,8 +2,8 @@
   "model_params": {
     "depth": 8,
     "iterations": 1500,
-    "l2_leaf_reg": 7,
-    "learning_rate": 0.1
+    "l2_leaf_reg": 5,
+    "learning_rate": 0.05
   },
   "feature_columns": [
     "property_size",
@@ -13,7 +13,6 @@
     "sqft_to_add",
     "material_grade",
     "structural_change",
-    "unit_type",
     "reno_bathroom",
     "reno_bedroom",
     "reno_kitchen",
