@@ -97,13 +97,6 @@ def preprocess_real(df, require_target=False):
         for key, suffix in fixed_types.items():
             df[f"reno_{suffix}"] = df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
 
-        # Select first renovation type as categorical feature
-        def choose_unit_type(lst):
-            if not lst:
-                return "unknown"
-            return lst[0]
-
-        df["unit_type"] = df["type_of_renovation_parsed"].apply(choose_unit_type)
 
         # Drop unused columns
         df = df.drop(
@@ -113,14 +106,13 @@ def preprocess_real(df, require_target=False):
 
         df["post_renovation_value"] = df["price"]
 
+        # structural_change naming consistency
+        if "structural_changes" in df.columns:
+            df["structural_change"] = df["structural_changes"].astype(int)
+
     else:
         # Ensure correct types
         df["material_grade"] = df["material_grade"].astype(float)
-        df["unit_type"] = df["unit_type"].astype(str)
-
-        # structural_change naming consistency
-        if "structural_change" in df.columns:
-            df["structural_changes"] = df["structural_change"].astype(int)
 
         df = df.drop(
             columns=["source_row"],
@@ -169,8 +161,7 @@ raw_feature_list = [
 "sqft_renovated",
 "sqft_to_add",
 "material_grade",
-"structural_changes",
-"unit_type",
+"structural_change",
 "reno_bathroom",
 "reno_bedroom",
 "reno_kitchen",
@@ -207,23 +198,34 @@ print(X_dev.describe())
 
 # # Evaluate parameter set using 5 fold CV
 # def evaluate(individual):
+
+#     # Extract hyperparameters from candidate solution
+#     # alpha controls L2 regularization strength
+#     # eta0 controls learning rate
 #     alpha = float(individual["alpha"])
 #     eta0 = float(individual["eta0"])
 
+#     # Create 5 fold split
+#     # Data is shuffled for robustness
 #     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 #     scores = []
 
+#     # Loop over each train and validation split
 #     for train_idx, val_idx in kf.split(X_dev):
 
+#         # Split raw features and targets
 #         X_tr_raw = X_dev.iloc[train_idx].values
 #         y_tr = y_dev.iloc[train_idx].values
 #         X_va_raw = X_dev.iloc[val_idx].values
 #         y_va = y_dev.iloc[val_idx].values
 
+#         # Scale features using pre fitted scaler
+#         # Important to apply same scaling to train and validatio
 #         X_tr = scaler.transform(X_tr_raw)
 #         X_va = scaler.transform(X_va_raw)
 
-
+#         # Create SGD regression model
+#         # max_iter=1 and warm_start=True allow manual control of training steps
 #         model = SGDRegressor(
 #             penalty="l2",
 #             alpha=alpha,
@@ -234,16 +236,24 @@ print(X_dev.describe())
 #             random_state=42
 #         )
 
-#         # initialize
+#         # Initialize model with one small batch
+#         # This creates internal structures
 #         model.partial_fit(X_tr[:1], y_tr[:1])
+
+#         # Replace weights with pretrained synthetic weights
+#         # This starts fine tuning from synthetic solution
 #         model.coef_ = w_syn.copy()
 #         model.intercept_ = np.array([b_syn])
 
-#         # fine tune on real fold
+#         # Fine tune on real training fold
+#         # Run 10 passes over training data
 #         for _ in range(10):
 #             model.partial_fit(X_tr, y_tr)
 
+#         # Predict on validation fold
 #         preds = model.predict(X_va)
+        
+#         # Compute R2 score and store
 #         scores.append(r2_score(y_va, preds))
 
 #     return np.mean(scores)
@@ -253,49 +263,75 @@ print(X_dev.describe())
 # # -----------------------------
 # # Evolutionary Search
 # # -----------------------------
+
+# # Number of candidate solutions per generation
 # POP_SIZE = 8
+
+# # Number of optimization rounds
 # GENERATIONS = 10
 
+# # Create initial population
+# # Each individual is a random set of hyperparameters
 # population = [random_individual() for _ in range(POP_SIZE)]
+
+# # Evaluate each individual using 5 fold CV
+# # Fitness = average R2 score
 # fitness = [evaluate(ind) for ind in population]
 
+# # Identify best individual from initial population
 # best_idx = np.argmax(fitness)
 # best_individual = population[best_idx]
 # best_score = fitness[best_idx]
 
 # print("Initial best R2:", best_score)
 
+# # Evolution loop
 # for gen in range(GENERATIONS):
 #     print("\nGeneration", gen + 1)
 
+#     # Store newly created individuals
 #     new_population = []
 
+#     # Create new candidate for each current individual
 #     for i, ind in enumerate(population):
-
+        
+#         # With 50 percent probability:
+#         # Combine current individual with another random partner
+#         # Move slightly toward partner in parameter space
 #         if random.random() < 0.5:
 #             partner = population[np.random.randint(POP_SIZE)]
 #             new_ind = {
 #             "alpha": ind["alpha"] + np.random.uniform(-0.2, 0.2) * (partner["alpha"] - ind["alpha"]),
 #             "eta0": ind["eta0"] + np.random.uniform(-0.2, 0.2) * (partner["eta0"] - ind["eta0"])
 #             }
+        
+#         # Otherwise:
+#         # Slightly perturb parameters randomly
 #         else:
 #             new_ind = {
 #             "alpha": ind["alpha"] + np.random.uniform(-0.1, 0.1),
 #             "eta0": ind["eta0"] + np.random.uniform(-0.1, 0.1)
 #             }
 
+#         # Keep parameters within allowed bounds
+#         # Prevent invalid values
 #         new_ind["alpha"] = float(np.clip(new_ind["alpha"], *BOUNDS["alpha"]))
 #         new_ind["eta0"] = float(np.clip(new_ind["eta0"], *BOUNDS["eta0"]))
         
 #         new_population.append(new_ind)
 
+#     # Evaluate new candidates
 #     new_fitness = [evaluate(ind) for ind in new_population]
 
+#     # Replacement
+#     # If new candidate performs better than current one,
+#     # replace the old individual
 #     for i in range(POP_SIZE):
 #         if new_fitness[i] > fitness[i]:
 #             population[i] = new_population[i]
 #             fitness[i] = new_fitness[i]
 
+#     # Track global best solution
 #     gen_best_idx = np.argmax(fitness)
 #     if fitness[gen_best_idx] > best_score:
 #         best_score = fitness[gen_best_idx]
@@ -303,6 +339,7 @@ print(X_dev.describe())
 
 #     print("Best R2 so far:", best_score)
 
+# # Save best hyperparameters found
 # best_params = {
 #     "alpha": float(best_individual["alpha"]),
 #     "eta0": float(best_individual["eta0"])
@@ -322,6 +359,8 @@ print(X_dev.describe())
 # with open("modelB/models/ridgeRegression/finetuned_best_params_ridge.json", "r") as f:
 #     best_params = json.load(f)
 
+# # Create final SGD regression model using tuned hyperparameters
+# # L2 penalty makes this equivalent to ridge regression
 # final_model = SGDRegressor(
 #     penalty="l2",
 #     alpha=best_params["alpha"],
@@ -332,12 +371,20 @@ print(X_dev.describe())
 #     random_state=42
 # )
 
+# # Scale full development dataset using training scaler
 # X_dev_scaled = scaler.transform(X_dev.values)
 
+# # Initialize model internal structure with one sample
+# # Required before manually setting coefficients
 # final_model.partial_fit(X_dev_scaled[:1], y_dev.values[:1])
+
+# # Replace weights with pretrained synthetic weights
+# # Start fine tuning from synthetic solution
 # final_model.coef_ = w_syn.copy()
 # final_model.intercept_ = np.array([b_syn])
 
+# # Fine tune on full real dataset
+# # Run 20 passes over the data
 # for _ in range(20):
 #     final_model.partial_fit(X_dev_scaled, y_dev.values)
 
@@ -354,19 +401,24 @@ loaded_model = joblib.load("modelB/models/ridgeRegression/synthetic_plus_real_sg
 
 #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+
+# Preprocess test data to match training schema
 real_test = preprocess_real(real_test, require_target=True)
 
-
+# Select raw feature columns used during training
 X_test_raw = real_test[raw_feature_list]
 
-X_test_enc = pd.get_dummies(X_test_raw, drop_first=True)
-
-X_test_enc = X_test_enc.reindex(columns=SYN_FEATURE_COLS, fill_value=0)
+# Align encoded test columns with synthetic training feature columns
+# Add missing columns with zeros to ensure identical structure
+X_test_enc = X_test_raw.reindex(columns=SYN_FEATURE_COLS)
 
 X_test = X_test_enc
 y_test = real_test["post_renovation_value"]
 
+# Scale features using same scaler fitted during training
 X_test_scaled = scaler.transform(X_test.values)
+
+# Generate predictions
 test_preds = loaded_model.predict(X_test_scaled)
 
 r2 = r2_score(y_test, test_preds)
@@ -381,5 +433,5 @@ preds_df = pd.DataFrame({
     "y_pred": test_preds
 })
 
-preds_path = "modelB/randomForest/randomForest_synthetic_test_predictions.csv"
+preds_path = "modelB/ridgeRegression/ridge_finetuned_synthetic_predictions.csv"
 preds_df.to_csv(preds_path, index=False)
