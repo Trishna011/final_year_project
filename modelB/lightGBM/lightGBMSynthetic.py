@@ -11,6 +11,9 @@ from lightgbm import LGBMRegressor, early_stopping
 train_exp = pd.read_csv("processed_data/synthetic_train_expanded.csv")
 val_exp = pd.read_csv("processed_data/synthetic_val_expanded.csv")
 
+# -------------------------------------------------------
+# Define MAPE metric
+# -------------------------------------------------------
 def mape(y_true, y_pred):
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
@@ -194,12 +197,14 @@ best_model = None
 # -------------------------------------------------------
 for params in ParameterGrid(param_grid):
 
+    # Create model with current parameters
     model = LGBMRegressor(
         objective="regression",
         random_state=42,
         **params
     )
 
+    # Train model
     model.fit(
         X_train,
         y_train,
@@ -208,22 +213,27 @@ for params in ParameterGrid(param_grid):
         callbacks=[early_stopping(100, verbose=False)]
     )
 
+    # Predict on validation set
     val_preds = model.predict(X_val)
 
+    # Combine predictions with real values
     pred_df = pd.DataFrame({
         "source_row": val_exp["source_row"].values,
         "y_true": y_val.values,
         "y_pred": val_preds,
     })
-
+    
+    # Average predictions per property
     prop_level = pred_df.groupby("source_row", as_index=False).agg(
         y_true=("y_true", "first"),
         y_pred=("y_pred", "mean"),
     )
 
+    # Calculate R2 and MAPE
     r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
     val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
 
+     # Keep best model based on R2
     if r2 > best_r2:
         best_r2 = r2
         best_params = params
