@@ -103,13 +103,13 @@ def preprocess_real(df, require_target=False):
 
         df["post_renovation_value"] = df["price"]
 
+        # structural_change naming consistency
+        if "structural_changes" in df.columns:
+            df["structural_change"] = df["structural_changes"].astype(int)
+
     else:
         # Ensure correct types
         df["material_grade"] = df["material_grade"].astype(float)
-
-        # structural_change naming consistency
-        if "structural_change" in df.columns:
-            df["structural_changes"] = df["structural_change"].astype(int)
 
         df = df.drop(
             columns=["source_row"],
@@ -143,9 +143,6 @@ dev_df = preprocess_real(dev_df, require_target=True)
 
 dev_df["post_renovation_value"] = dev_df["price"]
 
-for col in set(SYN_FEATURE_COLS) - set(dev_df.columns):
-    dev_df[col] = 0
-
 X_dev = dev_df[SYN_FEATURE_COLS]
 y_dev = dev_df["post_renovation_value"]
 
@@ -158,86 +155,86 @@ train_pool = Pool(
 #-----------------------------
 # tune with AAEO
 #-----------------------------
-BOUNDS = {
-    "learning_rate": (0.001, 0.04),
-    "depth": (4, 8),
-    "l2_leaf_reg": (1, 15),
-    "iterations": (150, 600)
-}
+# BOUNDS = {
+#     "learning_rate": (0.001, 0.04),
+#     "depth": (4, 8),
+#     "l2_leaf_reg": (1, 15),
+#     "iterations": (150, 600)
+# }
 
-# Random parameter generator
-def random_individual():
-    return {
-        "learning_rate": np.random.uniform(*BOUNDS["learning_rate"]),
-        "depth": np.random.randint(*BOUNDS["depth"] + (1,)),
-        "l2_leaf_reg": np.random.uniform(*BOUNDS["l2_leaf_reg"]),
-        "iterations": np.random.randint(*BOUNDS["iterations"] + (1,))
-    }
+# # Random parameter generator
+# def random_individual():
+#     return {
+#         "learning_rate": np.random.uniform(*BOUNDS["learning_rate"]),
+#         "depth": np.random.randint(*BOUNDS["depth"] + (1,)),
+#         "l2_leaf_reg": np.random.uniform(*BOUNDS["l2_leaf_reg"]),
+#         "iterations": np.random.randint(*BOUNDS["iterations"] + (1,))
+#     }
 
-# Evaluate parameter set by doing k-fold cross validation 
-def evaluate(individual):
-    clean_params = {}
-    for k, v in individual.items():
-        if k in ["depth", "iterations"]:
-            clean_params[k] = int(v)
-        else:
-            clean_params[k] = float(v)
+# # Evaluate parameter set by doing k-fold cross validation 
+# def evaluate(individual):
+#     clean_params = {}
+#     for k, v in individual.items():
+#         if k in ["depth", "iterations"]:
+#             clean_params[k] = int(v)
+#         else:
+#             clean_params[k] = float(v)
 
-    # data set split into 5 folds 
-    # each fold is used once as validation while the other 4 form the training set
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+#     # data set split into 5 folds 
+#     # each fold is used once as validation while the other 4 form the training set
+#     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    fold_scores = []
+#     fold_scores = []
 
-    for train_idx, val_idx in kf.split(X_dev):
+#     for train_idx, val_idx in kf.split(X_dev):
 
-        X_tr = X_dev.iloc[train_idx]
-        y_tr = y_dev.iloc[train_idx]
+#         X_tr = X_dev.iloc[train_idx]
+#         y_tr = y_dev.iloc[train_idx]
 
-        X_va = X_dev.iloc[val_idx]
-        y_va = y_dev.iloc[val_idx]
+#         X_va = X_dev.iloc[val_idx]
+#         y_va = y_dev.iloc[val_idx]
 
-        # Training inside each fold
-        # Fine tunes on synthetic model 
-        train_pool = Pool(
-            X_tr,
-            y_tr
-        )
+#         # Training inside each fold
+#         # Fine tunes on synthetic model 
+#         train_pool = Pool(
+#             X_tr,
+#             y_tr
+#         )
 
-        val_pool = Pool(
-            X_va,
-            y_va
-        )
+#         val_pool = Pool(
+#             X_va,
+#             y_va
+#         )
 
-        model = CatBoostRegressor(
-            loss_function="RMSE",
-            eval_metric="R2",
-            random_seed=42,
-            verbose=False,
-            **clean_params
-        )
+#         model = CatBoostRegressor(
+#             loss_function="RMSE",
+#             eval_metric="R2",
+#             random_seed=42,
+#             verbose=False,
+#             **clean_params
+#         )
 
-        #Early stopping used bc 
-        # if validation score does not improve for 100 consecutive rounds:
-        # Then training stop early to prevent overfitting and save time
-        model.fit(
-            train_pool,
-            eval_set=val_pool,
-            init_model=syn_model,
-            use_best_model=True,
-            early_stopping_rounds=100
-        )
+#         #Early stopping used bc 
+#         # if validation score does not improve for 100 consecutive rounds:
+#         # Then training stop early to prevent overfitting and save time
+#         model.fit(
+#             train_pool,
+#             eval_set=val_pool,
+#             init_model=syn_model,
+#             use_best_model=True,
+#             early_stopping_rounds=100
+#         )
 
-        # Computing R2 for this fold
-        preds = model.predict(val_pool)
-        fold_scores.append(r2_score(y_va, preds))
+#         # Computing R2 for this fold
+#         preds = model.predict(val_pool)
+#         fold_scores.append(r2_score(y_va, preds))
 
-    return np.mean(fold_scores)
+#     return np.mean(fold_scores)
 
-# Small evolutionary optimization loop to tune CatBoost hyperparameters.
-# Find the combination of learning_rate, depth, l2_leaf_reg, and iterations that maximizes R2 on the validation set.
+# # Small evolutionary optimization loop to tune CatBoost hyperparameters.
+# # Find the combination of learning_rate, depth, l2_leaf_reg, and iterations that maximizes R2 on the validation set.
 
-# Create 8 candidate parameter sets per generation.
+# # Create 8 candidate parameter sets per generation.
 # POP_SIZE = 8
 
 # #Take the current 8 parameter sets.
@@ -333,7 +330,7 @@ def evaluate(individual):
 #         "iterations": int(best_individual["iterations"])
 #         }
 
-# best_params_path = "modelB/models/catBoost/finetuned_best_params_AAEO3.json"
+# best_params_path = "modelB/models/catBoost/finetuned_best_params_AAEO4.json"
 # with open(best_params_path, "w") as f:
 #     json.dump(best_params, f, indent=2)
 
@@ -343,7 +340,7 @@ def evaluate(individual):
 # # Train final fine tuned model using best parameters
 # # -----------------------------
 
-# with open("modelB/models/catBoost/finetuned_best_params_AAEO3.json", "r") as f:
+# with open("modelB/models/catBoost/finetuned_best_params_AAEO4.json", "r") as f:
 #     best_params = json.load(f)
 
 
@@ -368,7 +365,7 @@ def evaluate(individual):
 
 
 
-# finetuned_model.save_model("modelB/models/catBoost/synthetic_plus_real_catboost_model3.cbm")
+# finetuned_model.save_model("modelB/models/catBoost/synthetic_plus_real_catboost_model4.cbm")
 
 
 # -------------------------------------------
@@ -376,15 +373,12 @@ def evaluate(individual):
 # -------------------------------------------
 loaded_model = CatBoostRegressor()
 
-loaded_model.load_model("modelB/models/catBoost/synthetic_plus_real_catboost_model3.cbm")
+loaded_model.load_model("modelB/models/catBoost/synthetic_plus_real_catboost_model4.cbm")
 
 
 #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 real_test = preprocess_real(real_test, require_target=True)
-
-for col in set(SYN_FEATURE_COLS) - set(real_test.columns):
-    real_test[col] = 0
 
 X_test = real_test[SYN_FEATURE_COLS]
 y_test = real_test["post_renovation_value"]
