@@ -95,14 +95,6 @@ def preprocess_real(df, require_target=False):
         for key, suffix in fixed_types.items():
             df[f"reno_{suffix}"] = df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
 
-        # Select first renovation type as categorical feature
-        def choose_unit_type(lst):
-            if not lst:
-                return "unknown"
-            return lst[0]
-
-        df["unit_type"] = df["type_of_renovation_parsed"].apply(choose_unit_type)
-
         # Drop unused columns
         df = df.drop(
             columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id", "extended_rooms"],
@@ -114,7 +106,6 @@ def preprocess_real(df, require_target=False):
     else:
         # Ensure correct types
         df["material_grade"] = df["material_grade"].astype(float)
-        df["unit_type"] = df["unit_type"].astype(str)
 
         # structural_change naming consistency
         if "structural_change" in df.columns:
@@ -160,7 +151,6 @@ raw_feature_list = [
 "sqft_to_add",
 "material_grade",
 "structural_changes",
-"unit_type",
 "reno_bathroom",
 "reno_bedroom",
 "reno_kitchen",
@@ -248,16 +238,26 @@ print(X_dev.describe())
 #         best_score = -np.inf
 #         current_trees = original_trees
 
+#         # Keep adding trees until we reach the allowed maximum
 #         while current_trees < original_trees + max_additional:
 #             current_trees += step
+            
+#             # Update model to use new number of trees
 #             base_model.set_params(n_estimators=current_trees)
+
+#             # Refit model on training fold
 #             base_model.fit(X_tr, y_tr)
 
+#             # Evaluate on validation fold
 #             preds = base_model.predict(X_va)
 #             score = r2_score(y_va, preds)
 
+#             # If validation performance improves, store it
 #             if score > best_score:
 #                 best_score = score
+            
+#             # If performance drops, stop adding trees
+#             # This simulates early stopping
 #             else:
 #                 break
         
@@ -421,8 +421,8 @@ with open("modelB/models/randomForest/finetuned_best_params_randomForest_AAEO.js
 loaded_model = joblib.load("modelB/models/randomForest/synthetic_plus_real_rf.pkl")
 
 
-real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 real_test = preprocess_real(real_test, require_target=True)
 
 X_test_raw = real_test[raw_feature_list]
@@ -448,5 +448,5 @@ preds_df = pd.DataFrame({
     "y_pred": test_preds
 })
 
-preds_path = "modelB/randomForest/randomForest_synthetic_test_predictions.csv"
+preds_path = "modelB/randomForest/randomForest_finetuned_synthetic_predictions.csv"
 preds_df.to_csv(preds_path, index=False)
