@@ -3,13 +3,15 @@ from sklearn.metrics import r2_score
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 import pandas as pd
-from lightgbm import LGBMRegressor, early_stopping
+from lightgbm import LGBMRegressor, early_stopping, LGBMRegressor
+import joblib
 
 # -------------------------------------------------------
 # Load expanded synthetic training and validation data
 # -------------------------------------------------------
 train_exp = pd.read_csv("processed_data/synthetic_train_expanded.csv")
 val_exp = pd.read_csv("processed_data/synthetic_val_expanded.csv")
+test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 
 # -------------------------------------------------------
 # Define MAPE metric
@@ -159,13 +161,23 @@ features = [
 # Remove rows where target is missing
 train_exp = train_exp.dropna(subset=[target])
 val_exp = val_exp.dropna(subset=[target])
+test_exp = test_exp.dropna(subset=[target])
 
 # Split features and target
 X_train = train_exp[features]
+X_train = train_exp[features].copy()
+X_train["unit_type"] = X_train["unit_type"].astype("category")
+
 y_train = train_exp[target]
 
 X_val = val_exp[features]
+X_val = val_exp[features].copy()
+X_val["unit_type"] = X_val["unit_type"].astype("category")
+
 y_val = val_exp[target]
+
+X_test = test_exp[features]
+y_test = test_exp[target]
 
 # -------------------------------------------------------
 # Convert categorical columns to category dtype
@@ -175,6 +187,7 @@ categorical_cols = ["unit_type"]
 for col in categorical_cols:
     X_train[col] = X_train[col].astype("category")
     X_val[col] = X_val[col].astype("category")
+    X_test["unit_type"] = X_test["unit_type"].astype("category")
 
 
 # -------------------------------------------------------
@@ -201,6 +214,7 @@ for params in ParameterGrid(param_grid):
     model = LGBMRegressor(
         objective="regression",
         random_state=42,
+        categorical_feature=["unit_type"],
         **params
     )
 
@@ -260,37 +274,84 @@ with open(params_path, "w") as f:
 # -------------------------------------------------------
 # Save best model
 # -------------------------------------------------------
-model_path = "modelB/models/lightGBM/lightgbm_synthetic_best_model.txt"
-best_model.booster_.save_model(model_path)
-
-print("saved model to:", model_path)
+joblib.dump(best_model, "lightgbm_model.pkl")
 
 # -------------------------------------------------------
-# Final validation predictions
+# Final preds on test set
 # -------------------------------------------------------
-val_preds = best_model.predict(X_val)
+
+test_preds = best_model.predict(X_test)
 
 pred_df = pd.DataFrame({
-    "source_row": val_exp["source_row"].values,
-    "y_true": y_val.values,
-    "y_pred": val_preds,
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test.values,
+    "y_pred": test_preds,
 })
 
+# Average predictions per property
 prop_level = pred_df.groupby("source_row", as_index=False).agg(
     y_true=("y_true", "first"),
     y_pred=("y_pred", "mean"),
 )
 
+# Evaluate performance
 r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+test_mape = mape(prop_level["y_true"], prop_level["y_pred"])
 
-print("final R2 with best params:", r2)
-print("final MAPE with best params:", val_mape)
+print("Test R2:", r2)
+print("Test MAPE:", test_mape)
+
+# -------------------------------------------------------
+# Final preds on real data test set
+# -------------------------------------------------------
+
+model = joblib.load("lightgbm_model.pkl")
+
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+
+# True values
+y_true = real_test["price"].astype(float).values
+
+# Preprocess
+X_real = preprocess_real_data(real_test).copy()
+
+# Ensure same column order
+X_real = X_real[features]
+
+# Convert to category
+X_real["unit_type"] = X_real["unit_type"].astype("category")
+
+# Align categories with training
+X_real["unit_type"] = pd.Categorical(
+    X_real["unit_type"],
+    categories=X_train["unit_type"].cat.categories
+)
+
+print("Dtypes:")
+print(X_real.dtypes)
+
+# Predict
+preds = model.predict(X_real)
+
+# Attach predictions
+real_test["predicted_post_renovation_value"] = preds
+
+# Evaluate
+r2 = r2_score(y_true, preds)
+
+mask = y_true != 0
+mape_val = np.mean(np.abs((y_true[mask] - preds[mask]) / y_true[mask])) * 100
+
+print("Real R2:", r2)
+print("Real MAPE:", mape_val)
+
+# Save
+real_test.to_csv("modelB/lightGBM/lightgbm_train_real_preds.csv", index=False)
 
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test
 # -------------------------------------------------------
-lightgbm_preds_path = "modelB/lightGBM/lightgbm_synthetic_preds.csv"
+lightgbm_preds_path = "modelB/lightGBM/lightgbm_train_synthetic_preds.csv"
 prop_level.to_csv(lightgbm_preds_path, index=False)
 
 print("Saved LightGBM synthetic predictions to", lightgbm_preds_path)
