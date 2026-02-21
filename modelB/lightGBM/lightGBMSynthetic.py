@@ -256,7 +256,7 @@ with open(params_path, "w") as f:
 # -------------------------------------------------------
 # Save best model
 # -------------------------------------------------------
-joblib.dump(best_model, "lightgbm_model.pkl")
+joblib.dump(best_model, "modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
 
 # -------------------------------------------------------
 # Final preds on test set
@@ -287,7 +287,8 @@ print("Test MAPE:", test_mape)
 # Final preds on real data test set
 # -------------------------------------------------------
 
-model = joblib.load("lightgbm_model.pkl")
+model = joblib.load("modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
+print("Model expects features:", model.booster_.num_feature())
 
 real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
@@ -319,10 +320,10 @@ print("Real MAPE:", mape_val)
 # Save
 real_test.to_csv("modelB/lightGBM/lightgbm_train_real_preds.csv", index=False)
 
-# -------------------------------------------------------
-# Save predictions for Wilcoxon test
-# -------------------------------------------------------
-lightgbm_preds_path = "modelB/lightGBM/lightgbm_train_synthetic_preds.csv"
-prop_level.to_csv(lightgbm_preds_path, index=False)
+# # -------------------------------------------------------
+# # Save predictions for Wilcoxon test
+# # -------------------------------------------------------
+# lightgbm_preds_path = "modelB/lightGBM/lightgbm_train_synthetic_preds.csv"
+# prop_level.to_csv(lightgbm_preds_path, index=False)
 
-print("Saved LightGBM synthetic predictions to", lightgbm_preds_path)
+# print("Saved LightGBM synthetic predictions to", lightgbm_preds_path)
