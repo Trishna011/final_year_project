@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.model_selection import ParameterGrid
 import pandas as pd
 
+
 # -------------------------------------------------------
 # Load expanded synthetic training and validation data
 # -------------------------------------------------------
@@ -43,11 +44,6 @@ def preprocess_real_data(df):
     }
 
     df["material_grade"] = df["material_grade"].map(material_map).fillna(1)
-
-    # --------------------------------------------------
-    # 3. Create unit_type default
-    # --------------------------------------------------
-    df["unit_type"] = "house"
 
     # --------------------------------------------------
     # 4. Create renovation flags from type_of_renovation
@@ -119,7 +115,6 @@ def preprocess_real_data(df):
         "sqft_to_add",
         "material_grade",
         "structural_change",
-        "unit_type",
         "reno_bathroom",
         "reno_bedroom",
         "reno_kitchen",
@@ -144,7 +139,6 @@ features = [
     "sqft_to_add",
     "material_grade",
     "structural_change",
-    "unit_type",
     "reno_bathroom",
     "reno_bedroom",
     "reno_kitchen",
@@ -165,32 +159,30 @@ X_val = val_exp[features]
 y_val = val_exp[target]
 
 # -------------------------------------------------------
-# Specify categorical feature indices for CatBoost
-# unit_type is categorical
+# Specify training and validation data
 # -------------------------------------------------------
-cat_features = [X_train.columns.get_loc("unit_type")]
 
-train_pool = Pool(X_train, y_train, cat_features=cat_features)
-val_pool = Pool(X_val, y_val, cat_features=cat_features)
+train_pool = Pool(X_train, y_train)
+val_pool = Pool(X_val, y_val,)
 
 # -------------------------------------------------------
 # Hyperparameter grid for tuning
 # We test multiple combinations to find best performance
 # -------------------------------------------------------
-# param_grid = {
-#     "depth": [6, 8, 10],
-#     "learning_rate": [0.03, 0.05, 0.1],
-#     "l2_leaf_reg": [3, 5, 7],
-#     "iterations": [1500, 2000],
-# }
+param_grid = {
+    "depth": [6, 8, 10],
+    "learning_rate": [0.03, 0.05, 0.1],
+    "l2_leaf_reg": [3, 5, 7],
+    "iterations": [1500, 2000],
+}
 
-# best_r2 = -np.inf
-# best_params = None
-# best_model = None
+best_r2 = -np.inf
+best_params = None
+best_model = None
 
-# # -------------------------------------------------------
-# # Grid search over parameter combinations
-# # -------------------------------------------------------
+# -------------------------------------------------------
+# Grid search over parameter combinations
+# -------------------------------------------------------
 # for params in ParameterGrid(param_grid):
 #     model = CatBoostRegressor(
 #         loss_function="RMSE",
@@ -285,9 +277,9 @@ val_pool = Pool(X_val, y_val, cat_features=cat_features)
 #     early_stopping_rounds=100,
 # )
 
-# -------------------------------------------------------
-# Save best model
-# -------------------------------------------------------
+# # -------------------------------------------------------
+# # Save best model
+# # -------------------------------------------------------
 # model_path = "modelB/models/catBoost/synthetic_catboost_best_model2.cbm"
 # best_model.save_model(model_path)
 # print("saved model to:", model_path)
@@ -299,60 +291,65 @@ model = CatBoostRegressor()
 model.load_model("modelB/models/catBoost/synthetic_catboost_best_model2.cbm")
 
 # -------------------------------------------------------
-# Final validation predictions
+# Evaluate on synthetic test set
 # -------------------------------------------------------
-val_preds = model.predict(X_val)
 
-pred_df = pd.DataFrame({
-    "source_row": val_exp["source_row"].values,
-    "y_true": y_val.values,
-    "y_pred": val_preds,
-})
+# test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+# test_exp = test_exp.dropna(subset=[target])
 
-# aggregate back to property level
-prop_level = pred_df.groupby("source_row", as_index=False).agg(
-    y_true=("y_true", "first"),
-    y_pred=("y_pred", "mean"),
-)
+# X_test = test_exp[features]
+# y_test = test_exp[target]
 
-# metrics
-r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+# # Predict
+# test_preds = model.predict(X_test)
 
-print("final R2 with best params:", r2)
-print("final MAPE with best params:", val_mape)
+# # Aggregate to property level
+# pred_df_test = pd.DataFrame({
+#     "source_row": test_exp["source_row"].values,
+#     "y_true": y_test.values,
+#     "y_pred": test_preds,
+# })
+
+# prop_level_test = pred_df_test.groupby("source_row", as_index=False).agg(
+#     y_true=("y_true", "first"),
+#     y_pred=("y_pred", "mean"),
+# )
+
+# # Metrics
+# test_r2 = r2_score(prop_level_test["y_true"], prop_level_test["y_pred"])
+# test_mape = mape(prop_level_test["y_true"], prop_level_test["y_pred"])
+
+# print("Synthetic Test R2:", test_r2)
+# print("Synthetic Test MAPE:", test_mape)
 
 
 # -------------------------------------------------------
 # Evaluate on real data
 # -------------------------------------------------------
 
-# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-# # Ground truth (post renovation value)
-# y_true = real_df["price"].astype(float)
+# Ground truth (post renovation value)
+y_true = real_df["price"].astype(float)
 
-# # Preprocess features
-# real_df_processed = preprocess_real_data(real_df)
+# Preprocess features
+real_df_processed = preprocess_real_data(real_df)
 
-# # Ensure feature alignment
-# real_X = real_df_processed[features]
+# Ensure feature alignment
+real_X = real_df_processed[features]
 
-# real_preds = model.predict(real_X)
+real_preds = model.predict(real_X)
 
-# # -------------------------------------------------------
-# # Evaluate
-# # -------------------------------------------------------
-# r2 = r2_score(y_true, real_preds)
-# real_mape = mape(y_true, real_preds)
+r2 = r2_score(y_true, real_preds)
+real_mape = mape(y_true, real_preds)
 
-# print("Real Data R2:", r2)
-# print("Real Data MAPE:", real_mape)
+print("Real Data R2:", r2)
+print("Real Data MAPE:", real_mape)
 
 # -------------------------------------------------------
 # Save feature order
 # -------------------------------------------------------
-feature_cols_path = "modelB/models/synthetic_feature_columns.json"
+feature_cols_path = "modelB/models/synthetic_feature_columns2.json"
 
 with open(feature_cols_path, "w") as f:
     json.dump(features, f, indent=2)
@@ -361,12 +358,12 @@ with open(feature_cols_path, "w") as f:
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-catboost_preds_path = "modelB/catBoost/catboost_synthetic_preds.csv"
+catboost_preds_path = "modelB/catBoost/catboost_train_real_preds.csv"
 
 pred_df = pd.DataFrame({
-    "source_row": prop_level["y_true"].index,
-    "y_true": prop_level["y_true"].values,
-    "y_pred": prop_level["y_pred"].values
+    "source_row": real_df.index,
+    "y_true": y_true.values,
+    "y_pred": real_preds
 })
 
 pred_df.to_csv(catboost_preds_path, index=False)
