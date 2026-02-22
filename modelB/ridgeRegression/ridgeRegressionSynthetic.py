@@ -260,7 +260,7 @@ print("Real Data MAPE:", real_mape)
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-catboost_preds_path = "modelB/ridgeRegression/ridge_train_real_preds.csv"
+ridge_preds_path = "modelB/ridgeRegression/ridge_train_real_preds.csv"
 
 pred_df = pd.DataFrame({
     "source_row": real_df.index,
@@ -274,6 +274,5 @@ pred_df = pd.DataFrame({
 #     "y_pred": prop_level["y_pred"].values
 # })
 
-pred_df.to_csv(catboost_preds_path, index=False)
+pred_df.to_csv(ridge_preds_path, index=False)
 
-print(f"Saved CatBoost synthetic predictions to {catboost_preds_path}")
