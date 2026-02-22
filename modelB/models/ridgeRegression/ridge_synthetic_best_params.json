@@ -1,5 +1,5 @@
 {
-  "model_params": {
+  "ridge_params": {
     "alpha": 1.0,
     "copy_X": true,
     "fit_intercept": true,
@@ -22,11 +22,6 @@
     "reno_kitchen",
     "reno_living_room",
     "reno_other_custom",
-    "reno_full_renovation",
-    "unit_type_bedroom",
-    "unit_type_full renovation",
-    "unit_type_kitchen",
-    "unit_type_living room",
-    "unit_type_other/custom"
+    "reno_full_renovation"
   ]
 }
