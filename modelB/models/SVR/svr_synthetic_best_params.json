@@ -1,0 +1,22 @@
+{
+  "best_params": {
+    "svr__C": 100000,
+    "svr__epsilon": 0.5,
+    "svr__gamma": "scale"
+  },
+  "feature_columns": [
+    "property_size",
+    "location",
+    "renovation_cost",
+    "sqft_renovated",
+    "sqft_to_add",
+    "material_grade",
+    "structural_change",
+    "reno_bathroom",
+    "reno_bedroom",
+    "reno_kitchen",
+    "reno_living_room",
+    "reno_other_custom",
+    "reno_full_renovation"
+  ]
+}
