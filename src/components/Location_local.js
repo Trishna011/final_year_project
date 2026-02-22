@@ -46,7 +46,6 @@ export default function Location({ onBack, onNext, answers }) {
 
       const valueData = await valueRes.json();
       if (!valueRes.ok) throw new Error("Value prediction failed");
-      console.log("post_renovation_value:", valueData.post_renovation_value);
       // ✅ Step 3: Pass both updated answers + cost to parent
       onNext({
         ...updatedAnswers,
