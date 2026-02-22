@@ -136,46 +136,33 @@ def encode(df):
     return df
 
 def expand_df(df):
-    # drop the specified columns
+
     df = df.drop(
         columns=[
+            "post_renovation_description",
+            "pre_renovation_cost",
             "renovation_type"
         ],
         errors="ignore"
     )
 
-    #expand renovations
-
     output_rows = []
 
     for src_idx, r in df.iterrows():
-        for _, r in df.iterrows():
 
-            sqft_ren = r["sqft_renovated"]
-            if isinstance(sqft_ren, str):
-                sqft_ren = ast.literal_eval(sqft_ren)
+        sqft_ren = r["sqft_renovated"]
+        sqft_add = r["sqft_to_add"]
+        mat = r["material_grade"]
+        struct = list(r["structural_changes"])
 
-            sqft_add = r["sqft_to_add"]
-            if isinstance(sqft_add, str):
-                sqft_add = ast.literal_eval(sqft_add)
-
-            mat = r["material_grade"]
-            if isinstance(mat, str):
-                mat = ast.literal_eval(mat)
-
-            struct = r["structural_changes"]
-            if isinstance(struct, str):
-                struct = ast.literal_eval(struct)
-
-        struct = list(struct)
         struct_idx = 0
-
 
         base = {
             "property_size": r["property_size"],
             "location": r["location"],
-            "renovation_cost": r["renovation_cost"],
+            "renovation_cost": r["renovation_cost"]
         }
+
         # bedrooms
         if r["reno_bedroom"] == 1:
             for i, sqft in enumerate(sqft_ren.get("bedrooms", [])):
@@ -193,6 +180,7 @@ def expand_df(df):
                     "reno_full_renovation": 0
                 })
                 struct_idx += 1
+
         # bathrooms
         if r["reno_bathroom"] == 1:
             for i, sqft in enumerate(sqft_ren.get("bathrooms", [])):
@@ -210,7 +198,8 @@ def expand_df(df):
                     "reno_full_renovation": 0
                 })
                 struct_idx += 1
-        # other spaces: kitchen, living room, custom, full reno
+
+        # other
         for k, sqft in sqft_ren.get("other", {}).items():
             k_lower = k.lower()
 
@@ -228,15 +217,5 @@ def expand_df(df):
                 "reno_full_renovation": int(k_lower == "full renovation"),
             })
             struct_idx += 1
-    expanded_df = pd.DataFrame(output_rows)
 
-    expanded_df = expanded_df.drop(
-        columns=[
-            "unit_index"
-        ],
-        errors="ignore"
-    )
-
-    print(expanded_df)
-
-    return expanded_df
+    return pd.DataFrame(output_rows)

@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 import traceback
 from flask_cors import CORS
 from model.featureEngineering import add_labour_rate, prediction, expand_records
-from modelB.catboost.finalModelHybrid import value_prediction
+from modelB.catboost.catBoostFineTuned import predict_cost_from_input
 from modelB.preprocessingUserInp import encode, expand_df
 import pandas as pd
 
@@ -67,7 +67,7 @@ def value():
         # run hybrid value prediction
         df = encode(df)
         expanded_df = expand_df(df)
-        post_renovation_value = round(float(value_prediction(expanded_df)[0]), 2)
+        post_renovation_value = round(float(predict_cost_from_input(expanded_df)), 2)
 
         return jsonify({
             "post_renovation_value": post_renovation_value,

@@ -10,52 +10,39 @@ def mean_absolute_percentage_error(y_true, y_pred):
     y_pred = np.array(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true))
 
-real_train_df = pd.read_csv("processed_data/real_train_preprocessed.csv")
-real_val_preprocessed = pd.read_csv("processed_data/real_val_preprocessed.csv")
+# -------------------------------------------------------
+# Load combined training dataset
+# -------------------------------------------------------
+real_train_df = pd.read_csv("processed_data/real_train_val_preprocessed.csv")
 
 # -------------------------------------------------------
 # Load Sentence BERT model
-# This converts property descriptions into dense vectors
 # -------------------------------------------------------
 sbert = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------------------------------------
 # Convert text descriptions into embeddings
-# Each description becomes a numeric vector
 # -------------------------------------------------------
 X_text_train = sbert.encode(
     real_train_df["description"].tolist(),
     show_progress_bar=True
 )
 
-X_text_val = sbert.encode(
-    real_val_preprocessed["description"].tolist(),
-    show_progress_bar=True
-)
-
 # -------------------------------------------------------
-# Add location as an additional numeric feature
-# Location was already encoded earlier in preprocessing
+# Add location feature
 # -------------------------------------------------------
 loc_train = real_train_df["location"].values.reshape(-1, 1)
-loc_val = real_val_preprocessed["location"].values.reshape(-1, 1)
 
-# Combine text embeddings and location into final feature matrix
 X_train = np.hstack([X_text_train, loc_train])
-X_val = np.hstack([X_text_val, loc_val])
 
 # -------------------------------------------------------
-# Log transform price
-# This reduces skew and stabilizes variance
-# The model learns log(price), not raw price
+# Log transform target
 # -------------------------------------------------------
 y_train = np.log1p(real_train_df["price"].values)
-y_val_true = real_val_preprocessed["price"].values
 
 # -------------------------------------------------------
 # Initialize CatBoost regressor
-# RMSE is applied in log space
-# Early stopping prevents overfitting
+# Early stopping removed because no validation set
 # -------------------------------------------------------
 model = CatBoostRegressor(
     iterations=1000,
@@ -63,57 +50,71 @@ model = CatBoostRegressor(
     learning_rate=0.05,
     loss_function="RMSE",
     random_seed=42,
-    early_stopping_rounds=50,
     verbose=100
 )
 
 # -------------------------------------------------------
-# Train model using validation set for early stopping
-# Validation target is also log transformed
+# Train on full training dataset
 # -------------------------------------------------------
-model.fit(
-    X_train,
-    y_train,
-    eval_set=(X_val, np.log1p(y_val_true))
+model.fit(X_train, y_train)
+
+# -------------------------------------------------------
+# Load test dataset
+# -------------------------------------------------------
+real_test_preprocessed = pd.read_csv("processed_data/real_test_preprocessed.csv")
+
+# -------------------------------------------------------
+# Generate SBERT embeddings for test descriptions
+# -------------------------------------------------------
+X_text_test = sbert.encode(
+    real_test_preprocessed["description"].tolist(),
+    show_progress_bar=True
 )
 
 # -------------------------------------------------------
-# Make predictions on validation set
-# Predictions are in log scale
+# Add location feature
 # -------------------------------------------------------
-y_val_log = np.log1p(real_val_preprocessed["price"].values)
-val_preds_log = model.predict(X_val)
+loc_test = real_test_preprocessed["location"].values.reshape(-1, 1)
+
+X_test = np.hstack([X_text_test, loc_test])
+
 # -------------------------------------------------------
-# Convert predictions back to original price scale
-# expm1 reverses log1p transformation
+# Prepare true target
 # -------------------------------------------------------
-val_preds_price = np.expm1(val_preds_log)
-y_val_price = real_val_preprocessed["price"].values
+y_test_price = real_test_preprocessed["price"].values
+y_test_log = np.log1p(y_test_price)
 
-# =========================
-# SAVE PREDICTIONS FOR EVALUATION
-# =========================
+# -------------------------------------------------------
+# Predict
+# -------------------------------------------------------
+test_preds_log = model.predict(X_test)
 
-preds_path = "modelB/catBoost/sbert_catboost_real_preds.csv"
+# -------------------------------------------------------
+# Convert predictions back to price scale
+# -------------------------------------------------------
+test_preds_price = np.expm1(test_preds_log)
 
-pred_df = pd.DataFrame({
-    "id": real_val_preprocessed.index,
-    "y_true": y_val_price,
-    "y_pred": val_preds_price
+# -------------------------------------------------------
+# Evaluate
+# -------------------------------------------------------
+r2_test = r2_score(y_test_log, test_preds_log)
+mape_test = mean_absolute_percentage_error(y_test_price, test_preds_price)
+
+print("Test R^2 (log price):", r2_test)
+print("Test MAPE:", mape_test)
+print("Test MAPE (%):", mape_test * 100)
+
+# -------------------------------------------------------
+# Save predictions
+# -------------------------------------------------------
+preds_path = "modelB/catBoost/sbert_catboost_real_test_preds.csv"
+
+test_pred_df = pd.DataFrame({
+    "id": real_test_preprocessed.index,
+    "y_true": y_test_price,
+    "y_pred": test_preds_price
 })
 
-pred_df.to_csv(preds_path, index=False)
+test_pred_df.to_csv(preds_path, index=False)
 
-print(f"Saved Sentence-BERT CatBoost predictions to {preds_path}")
-
-
-mape = mean_absolute_percentage_error(y_val_price, val_preds_price)
-
-
-r2 = r2_score(y_val_log, val_preds_log)
-
-print("R^2 (log price):", r2)
-print("MAPE:", mape)
-print("MAPE (%):", mape * 100)
-
-
+print("Saved test predictions to", preds_path)
