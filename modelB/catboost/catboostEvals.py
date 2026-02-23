@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 from openpyxl import Workbook
 from modelB.catboost.catBoostFineTuned import run_test_predictions
+import shap
 
-y_test, test_preds, real_test = run_test_predictions()
+y_test, test_preds, real_test, loaded_model, X_test = run_test_predictions()
 
 # -------------------------
 # Plot predicted vs acc cost graph
@@ -86,3 +87,11 @@ y_test, test_preds, real_test = run_test_predictions()
 # output_path = "../../graphs/predicted_uplift_summary.xlsx"
 
 # summary_table.to_excel(output_path, index=True)
+
+# -------------------------------
+# calculate shap values
+# -------------------------------
+explainer = shap.TreeExplainer(loaded_model)
+shap_values = explainer.shap_values(X_test)
+shap.summary_plot(shap_values, X_test)
+shap.summary_plot(shap_values, X_test, plot_type="bar")

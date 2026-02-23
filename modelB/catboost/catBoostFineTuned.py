@@ -406,7 +406,7 @@ def run_test_predictions():
     preds_path = "modelB/catBoost/catboost_finetuned_real_predictions.csv"
     preds_df.to_csv(preds_path, index=False)
 
-    return y_test, test_preds, real_test
+    return y_test, test_preds, real_test, loaded_model, X_test
 
 # -------------------------------------------
 # Function to preprocess single input and predict cost
@@ -426,6 +426,3 @@ def predict_cost_from_input(input_dict):
     prediction = loaded_model.predict(pool)
 
     return float(prediction[0])
-
-if __name__ == __"main"__:
-    y_test, test_preds, real_test = run_test_predictions()
