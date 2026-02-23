@@ -23,108 +23,106 @@ def mape(y_true, y_pred):
     return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
 
 
-def preprocess_real_data(df):
-    df = df.copy()
+# -----------------------------
+# Normalize material text into consistent format
+# -----------------------------
+def normalize_material(x):
+    if pd.isna(x):
+        return np.nan
+    return (
+        str(x)
+        .lower()
+        .strip()
+        .replace("_", "-")
+        .replace(" ", "-")
+    )
 
-    # --------------------------------------------------
-    # 1. Fix column names
-    # --------------------------------------------------
+# -----------------------------
+# Normalize renovation tokens
+# -----------------------------
+def normalize_token(x):
+    return " ".join(x.lower().strip().split())
+
+# -----------------------------
+# Parse renovation type column into list format
+# Converts string or list string into list format
+# -----------------------------
+def parse_reno(value):
+    if pd.isna(value):
+        return []
+    value = str(value)
+    if value.startswith("[") and value.endswith("]"):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return [normalize_token(v) for v in parsed if isinstance(v, str)]
+        except Exception:
+            return []
+    return [normalize_token(value)]
+
+
+# -----------------------------
+# Preprocess real dataset to match synthetic schema
+# -----------------------------
+def preprocess_real(df, require_target=False):
     
-    df["structural_change"] = df["structural_changes"]
+    if "type_of_renovation" in df.columns:
+        # Clean renovation type column
+        df["type_of_renovation"] = df["type_of_renovation"].astype(str).str.strip().str.lower()
+        df = df[~df["type_of_renovation"].isin(["", "nan", "none", "null"])]
 
-    # --------------------------------------------------
-    # 2. Encode material_grade to numeric
-    # MUST match synthetic encoding if used during training
-    # Adjust mapping if different
-    # --------------------------------------------------
-    material_map = {
-        "mid-range": 1,
-        "high-end": 2,
-        "low-end": 0
-    }
-
-    df["material_grade"] = df["material_grade"].map(material_map).fillna(1)
-
-    # --------------------------------------------------
-    # 4. Create renovation flags from type_of_renovation
-    # --------------------------------------------------
-    def parse_flags(val):
-        flags = {
-            "reno_bathroom": 0,
-            "reno_bedroom": 0,
-            "reno_kitchen": 0,
-            "reno_living_room": 0,
-            "reno_other_custom": 0,
-            "reno_full_renovation": 0
+        # Encode material grade ordinally
+        material_mapping = {
+            "budget-friendly": 0,
+            "mid-range": 1,
+            "high-end": 2
         }
 
-        if pd.isna(val) or val == "":
-            return flags
+        df["material_grade"] = df["material_grade"].apply(normalize_material)
+        df["material_grade"] = df["material_grade"].map(material_mapping)
+        df["material_grade"] = df["material_grade"].astype(float)
 
-        if isinstance(val, str):
-            try:
-                parsed = eval(val)
-            except:
-                parsed = []
-        else:
-            parsed = val
+    
+        # Parse renovation types into structured form
+        df["type_of_renovation_parsed"] = df["type_of_renovation"].apply(parse_reno)
 
-        if not isinstance(parsed, list):
-            return flags
+        # Create one hot features for renovation types
+        fixed_types = {
+            "bathroom": "bathroom",
+            "bedroom": "bedroom",
+            "kitchen": "kitchen",
+            "living room": "living_room",
+            "other/custom": "other_custom",
+            "full renovation": "full_renovation"
+        }
 
-        for room in parsed:
-            r = str(room).lower()
-            if "bathroom" in r:
-                flags["reno_bathroom"] = 1
-            elif "bedroom" in r:
-                flags["reno_bedroom"] = 1
-            elif "kitchen" in r:
-                flags["reno_kitchen"] = 1
-            elif "living" in r:
-                flags["reno_living_room"] = 1
-            elif "other" in r:
-                flags["reno_other_custom"] = 1
+        for suffix in fixed_types.values():
+            df[f"reno_{suffix}"] = 0
 
-        return flags
+        for key, suffix in fixed_types.items():
+            df[f"reno_{suffix}"] = df["type_of_renovation_parsed"].apply(lambda lst: int(key in lst))
 
-    flag_df = df["type_of_renovation"].apply(parse_flags).apply(pd.Series)
-    df = pd.concat([df, flag_df], axis=1)
+        # Drop unused columns
+        df = df.drop(
+            columns=["type_of_renovation", "type_of_renovation_parsed", "Location", "id", "extended_rooms"],
+            errors="ignore"
+        )
 
-    # --------------------------------------------------
-    # 5. Ensure numeric types
-    # --------------------------------------------------
-    numeric_cols = [
-        "property_size",
-        "renovation_cost",
-        "sqft_renovated",
-        "sqft_to_add",
-        "structural_change"
-    ]
+        df["post_renovation_value"] = df["price"]
 
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        # structural_change naming consistency
+        if "structural_changes" in df.columns:
+            df["structural_change"] = df["structural_changes"].astype(int)
 
-    # --------------------------------------------------
-    # 6. Select exact feature order
-    # --------------------------------------------------
-    features = [
-        "property_size",
-        "location",
-        "renovation_cost",
-        "sqft_renovated",
-        "sqft_to_add",
-        "material_grade",
-        "structural_change",
-        "reno_bathroom",
-        "reno_bedroom",
-        "reno_kitchen",
-        "reno_living_room",
-        "reno_other_custom",
-        "reno_full_renovation"
-        ]
+    else:
+        # Ensure correct types
+        df["material_grade"] = df["material_grade"].astype(float)
 
-    return df[features]
-
+        df = df.drop(
+            columns=["source_row"],
+            errors="ignore"
+        )
+    return df
 # -------------------------------------------------------
 # Define target and feature columns
 # Target is synthetic post renovation value
@@ -329,11 +327,11 @@ model.load_model("modelB/models/catBoost/synthetic_catboost_best_model2.cbm")
 
 real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-# Ground truth (post renovation value)
-y_true = real_df["price"].astype(float)
-
 # Preprocess features
-real_df_processed = preprocess_real_data(real_df)
+real_df_processed = preprocess_real(real_df)
+
+# Ground truth (post renovation value)
+y_true = real_df_processed["price"].astype(float)
 
 # Ensure feature alignment
 real_X = real_df_processed[features]
@@ -361,7 +359,7 @@ with open(feature_cols_path, "w") as f:
 catboost_preds_path = "modelB/catBoost/catboost_train_real_preds.csv"
 
 pred_df = pd.DataFrame({
-    "source_row": real_df.index,
+    "source_row": real_df_processed.index,
     "y_true": y_true.values,
     "y_pred": real_preds
 })

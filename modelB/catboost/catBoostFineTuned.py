@@ -375,35 +375,38 @@ loaded_model = CatBoostRegressor()
 
 loaded_model.load_model("modelB/models/catBoost/synthetic_plus_real_catboost_model4.cbm")
 
+def run_test_predictions():
 
-# #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-# real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-# real_test = preprocess_real(real_test, require_target=True)
+    real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+    #real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+    real_test = preprocess_real(real_test, require_target=True)
 
-# X_test = real_test[SYN_FEATURE_COLS]
-# y_test = real_test["post_renovation_value"]
+    X_test = real_test[SYN_FEATURE_COLS]
+    y_test = real_test["post_renovation_value"]
 
-# train_pool = Pool(
-#     X_test,
-#     y_test
-# )
+    train_pool = Pool(
+        X_test,
+        y_test
+    )
 
-# test_preds = loaded_model.predict(train_pool)
+    test_preds = loaded_model.predict(train_pool)
 
-# r2 = r2_score(y_test, test_preds)
-# test_mape = mape(y_test, test_preds)
+    r2 = r2_score(y_test, test_preds)
+    test_mape = mape(y_test, test_preds)
 
-# print("Loaded model R2 on real test:", r2)
-# print("Loaded model MAPE on real test:", test_mape)
+    print("Loaded model R2 on real test:", r2)
+    print("Loaded model MAPE on real test:", test_mape)
 
-# # Save predictions
-# preds_df = pd.DataFrame({
-#     "y_true": y_test.values,
-#     "y_pred": test_preds
-# })
+    # Save predictions
+    preds_df = pd.DataFrame({
+        "y_true": y_test.values,
+        "y_pred": test_preds
+    })
 
-# preds_path = "modelB/catBoost/catboost_finetuned_synthetic_predictions.csv"
-# preds_df.to_csv(preds_path, index=False)
+    preds_path = "modelB/catBoost/catboost_finetuned_real_predictions.csv"
+    preds_df.to_csv(preds_path, index=False)
+
+    return y_test, test_preds, real_test
 
 # -------------------------------------------
 # Function to preprocess single input and predict cost
@@ -423,3 +426,6 @@ def predict_cost_from_input(input_dict):
     prediction = loaded_model.predict(pool)
 
     return float(prediction[0])
+
+if __name__ == __"main"__:
+    y_test, test_preds, real_test = run_test_predictions()
