@@ -81,10 +81,11 @@ export default function BedBathCount({ onNext, onBack, selected }) {
                 const raw = e.target.value
 
                 if (raw === '') return
+                if (!/^\d+$/.test(raw)) return
 
                 const value = Number(raw)
 
-                if (!isNaN(value)) {
+                if (value >= 0) {
                 setBedrooms(value)
                 }
               }}
@@ -110,10 +111,11 @@ export default function BedBathCount({ onNext, onBack, selected }) {
                 const raw = e.target.value
 
                 if (raw === '') return
+                if (!/^\d+$/.test(raw)) return
 
                 const value = Number(raw)
 
-                if (!isNaN(value)) {
+                if (value >= 0) {
                 setBathrooms(value)
                 }
               }}
