@@ -9,6 +9,7 @@ export default function SqftToReno({ onBack, onNext, answers }) {
   const bedroomCount = answers?.bedrooms_to_reno ?? 0;
   const bathroomCount = answers?.bathrooms_to_reno ?? 0;
   const isFullReno = renovationTypes.includes("Full renovation");
+  const [showError, setShowError] = useState(false);
 
 
   // Build dynamic input structure just like SqftToAdd
@@ -67,6 +68,11 @@ export default function SqftToReno({ onBack, onNext, answers }) {
       Object.values(values.other).every(v => v !== "");
 
   const handleNext = () => {
+    if (!allFilled) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
     onNext({
       sqft_renovated: {
         bedrooms: values.bedrooms.map(Number),
@@ -170,6 +176,20 @@ export default function SqftToReno({ onBack, onNext, answers }) {
         ))}
       </VStack>
 
+      {showError && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            Please fill in all fields before continuing
+          </Text>
+        </Box>
+      )}
+
       <Box mt={10}>
         <Button variant="ghost" colorScheme="gray" rounded="full" mr={4} onClick={onBack}>
           Back
@@ -177,12 +197,9 @@ export default function SqftToReno({ onBack, onNext, answers }) {
         <Button
           rounded="full"
           px={8}
-          bg={allFilled ? "black" : "gray.600"}
+          bg="black"
           color="white"
-          opacity={allFilled ? 1 : 0.6}
-          cursor={allFilled ? "pointer" : "not-allowed"}
-          isDisabled={!allFilled}
-          onClick={allFilled ? handleNext : undefined}
+          onClick={handleNext}
         >
           Next
         </Button>
