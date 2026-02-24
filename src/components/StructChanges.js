@@ -10,26 +10,36 @@ export default function StructChanges({ onBack, onNext, answers }) {
   const renovationTypes = answers?.renovation_type ?? [];
   const isFullReno = renovationTypes.includes("Full renovation");
 
-
-  // Build card list just like SqftToAdd style
   const roomList = isFullReno
-  ? ["Full renovation"]
-  : [
-      ...Array.from({ length: bedroomCount }, (_, i) => `Bedroom ${i + 1}`),
-      ...Array.from({ length: bathroomCount }, (_, i) => `Bathroom ${i + 1}`),
-      ...renovationTypes.filter(t => !["Bedroom", "Bathroom"].includes(t)),
-    ];
-
+    ? ["Full renovation"]
+    : [
+        ...Array.from({ length: bedroomCount }, (_, i) => `Bedroom ${i + 1}`),
+        ...Array.from({ length: bathroomCount }, (_, i) => `Bathroom ${i + 1}`),
+        ...renovationTypes.filter(t => !["Bedroom", "Bathroom"].includes(t)),
+      ];
 
   const [selected, setSelected] = useState(Array(roomList.length).fill(null));
+  const [showError, setShowError] = useState(false);
 
   const updateSelection = (index, val) => {
     const next = [...selected];
     next[index] = val;
+    setShowError(false);
     setSelected(next);
   };
 
   const allSelected = selected.every(v => v !== null);
+
+  const handleNext = () => {
+    if (!allSelected) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
+    onNext({
+      structural_changes: isFullReno ? [selected[0]] : selected
+    });
+  };
 
   return (
     <MotionBox
@@ -48,7 +58,6 @@ export default function StructChanges({ onBack, onNext, answers }) {
     >
       <Heading mb={8}>Any structural changes required?</Heading>
 
-      {/* Scrollable section same as SqftToAdd */}
       <VStack
         spacing={6}
         w="100%"
@@ -60,7 +69,6 @@ export default function StructChanges({ onBack, onNext, answers }) {
           "&::-webkit-scrollbar-thumb": { background: "#d1d1d1", borderRadius: "10px" }
         }}
       >
-
         {roomList.map((name, index) => (
           <Box
             key={index}
@@ -101,7 +109,20 @@ export default function StructChanges({ onBack, onNext, answers }) {
         ))}
       </VStack>
 
-      {/* Buttons */}
+      {showError && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            Please answer all rooms before continuing
+          </Text>
+        </Box>
+      )}
+
       <Box mt={10}>
         <Button variant="ghost" colorScheme="gray" rounded="full" mr={4} onClick={onBack}>
           Back
@@ -109,14 +130,9 @@ export default function StructChanges({ onBack, onNext, answers }) {
         <Button
           rounded="full"
           px={8}
-          bg={allSelected ? "black" : "gray.600"}
+          bg="black"
           color="white"
-          opacity={allSelected ? 1 : 0.6}
-          cursor={allSelected ? "pointer" : "not-allowed"}
-          isDisabled={!allSelected}
-          onClick={() => allSelected && onNext({
-            structural_changes: isFullReno ? [selected[0]] : selected
-          })}
+          onClick={handleNext}
         >
           Next
         </Button>
