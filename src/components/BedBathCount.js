@@ -3,7 +3,8 @@ import {
   Button,
   Heading,
   VStack,
-  Input
+  Input,
+  Text
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -13,11 +14,23 @@ const MotionBox = motion(Box);
 export default function BedBathCount({ onNext, onBack, selected }) {
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
+  const [showError, setShowError] = useState(false);
 
   const isFullReno = selected.includes("Full renovation");
 
+  const isEmpty = (bedrooms.length === 0 || bathrooms.length === 0) ;
+  const isZeroOrNegative = !isEmpty && (Number(bedrooms) <= 0 || Number(bathrooms) <= 0);
+  const canProceed = !isEmpty && !isZeroOrNegative;
+
   const handleContinue = () => {
     const data = {};
+
+    if (!canProceed) {
+      setShowError(true);
+      
+      return;
+    }
+    setShowError(false);
 
     if (selected.includes("Bedroom") || isFullReno) {
       data.bedrooms_to_reno = bedrooms;
@@ -30,9 +43,12 @@ export default function BedBathCount({ onNext, onBack, selected }) {
     onNext(data);
   };
 
-  const canContinue =
-    ((!selected.includes("Bedroom") && !isFullReno) || bedrooms >= 1) &&
-    ((!selected.includes("Bathroom") && !isFullReno) || bathrooms >= 1);
+
+  let errorMessage = "";
+  if (showError) {
+    if (isEmpty) errorMessage = "Please enter a value";
+    else if (isZeroOrNegative) errorMessage = "Please enter a number greater than 0";
+  }
 
   return (
     <MotionBox
@@ -91,6 +107,21 @@ export default function BedBathCount({ onNext, onBack, selected }) {
         )}
       </VStack>
 
+      {/* ✅ Dynamic Error Message */}
+      {showError && errorMessage && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            {errorMessage}
+          </Text>
+        </Box>
+      )}
+
       <Box mt={10}>
         <Button
           colorScheme="gray"
@@ -103,15 +134,11 @@ export default function BedBathCount({ onNext, onBack, selected }) {
         </Button>
 
         <Button
-          bg={canContinue ? "black" : "gray.600"}
-          color="white"
           rounded="full"
           px={8}
-          opacity={canContinue ? 1 : 0.6}
-          cursor={canContinue ? "pointer" : "not-allowed"}
-          isDisabled={!canContinue}
-          onClick={canContinue ? handleContinue : undefined}
-        >
+          bg={"black"}
+          color="white"
+          onClick={handleContinue}>
           Next
         </Button>
       </Box>
