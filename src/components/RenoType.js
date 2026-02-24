@@ -1,4 +1,4 @@
-import { Box, Button, Heading, SimpleGrid } from "@chakra-ui/react";
+import { Box, Button, Heading, SimpleGrid, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
@@ -6,6 +6,7 @@ const MotionBox = motion(Box);
 
 export default function RenoType({ onBack, onNext, step }) {
   const [selectedOptions, setSelectedOptions] = useState([]);
+  const [showError, setShowError] = useState(false);
 
   const options = [
     { id: 1, label: "Full renovation" },
@@ -16,8 +17,18 @@ export default function RenoType({ onBack, onNext, step }) {
     { id: 6, label: "Other/Custom" },
   ];
 
+  const handleNext = () => {
+    if (selectedOptions.length === 0) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
+    onNext({ renovation_type: selectedOptions });
+  };
+
   const toggleOption = (label) => {
-  setSelectedOptions((prev) => {
+    setShowError(false);
+    setSelectedOptions((prev) => {
     let updated;
 
     // Toggle clicked item
@@ -28,7 +39,7 @@ export default function RenoType({ onBack, onNext, step }) {
     }
 
     // Selecting FULL RENOVATION removes others immediately
-    if (label === "Full renovation") return ["Full renovation"];
+    if (label === "Full renovation" && !prev.includes("Full renovation")) return ["Full renovation"];
 
     // If Full renovation was selected before & another option is selected → remove it
     if (updated.includes("Full renovation") && label !== "Full renovation") {
@@ -93,6 +104,21 @@ export default function RenoType({ onBack, onNext, step }) {
         })}
       </SimpleGrid>
 
+      {showError && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            Please select at least one option
+          </Text>
+        </Box>
+      )}
+
+
       <Box mt={10}>
         <Button
           colorScheme="gray"
@@ -105,17 +131,11 @@ export default function RenoType({ onBack, onNext, step }) {
         </Button>
 
         <Button
-          bg={selectedOptions.length === 0 ? "gray.600" : "black"}
+           bg="black"
           color="white"
           rounded="full"
           px={8}
-          opacity={selectedOptions.length === 0 ? 0.6 : 1}
-          cursor={selectedOptions.length === 0 ? "not-allowed" : "pointer"}
-          isDisabled={selectedOptions.length === 0}
-          onClick={() =>
-            selectedOptions.length > 0 &&
-            onNext({ renovation_type: selectedOptions })
-          }
+          onClick={handleNext}
         >
           Next
         </Button>
