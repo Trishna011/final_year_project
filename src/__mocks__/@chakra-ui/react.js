@@ -20,8 +20,12 @@ const VStack = ({ children }) => React.createElement('div', null, children)
 
 const SimpleGrid = ({ children }) => React.createElement('div', null, children)
 
-const Input = ({ onChange, value, placeholder }) =>
-  React.createElement('input', { onChange, value, placeholder })
+const Input = ({onChange, value, placeholder, type, min,
+...rest
+}) =>
+React.createElement('input', { onChange, value, placeholder, type, min,
+...rest
+})
 
 const Field = {
   Root: ({ children }) => React.createElement('div', null, children)

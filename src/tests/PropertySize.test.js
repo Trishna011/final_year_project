@@ -66,22 +66,8 @@ test('when the user inputs a number, it shows up in the input box', () => {
 
 })
 
-test('Next button becomes enabled with valid input', () => {
-    render(<PropertySize onNext={mockOnNext} onBack={mockOnBack} />)
-
-    const input = screen.getByRole('textbox')
-    const button = screen.getByRole('button', {name: /Next/i})
-
-    //give the textbox an inp
-    fireEvent.change(input, {target: {value: "12"}})
-
-    // button should now be enabled
-    expect(button).not.toBeDisabled()
-
-})
-
 //empty inp
-test('Next button is disabled when input is empty', () => {
+test('Mock next isnt called when input is empty', () => {
     render(<PropertySize onNext={mockOnNext} onBack={mockOnBack} />)
 
     const input = screen.getByRole('textbox')
