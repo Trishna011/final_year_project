@@ -30,6 +30,7 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
 
 
   const [values, setValues] = useState(initialValues);
+  const [showError, setShowError] = useState(false);
 
   const materialOptions = ["High-end", "Mid-range", "Budget-friendly"];
 
@@ -68,7 +69,13 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
       values.bathrooms.every(v => v !== "") &&
       Object.values(values.other).every(v => v !== "");
 
+
   const handleNext = () => {
+    if (!allSelected) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
     onNext({
       material_grade: {
         bedrooms: values.bedrooms,
@@ -193,6 +200,20 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
 
       </VStack>
 
+      {showError && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            Please select a material grade for all rooms
+          </Text>
+        </Box>
+      )}
+
       <Box mt={10}>
         <Button variant="ghost" colorScheme="gray" rounded="full" mr={4} onClick={onBack}>
           Back
@@ -201,12 +222,9 @@ export default function MaterialGrade({ onBack, onNext, answers }) {
         <Button
           rounded="full"
           px={8}
-          bg={allSelected ? "black" : "gray.600"}
+          bg="black"
           color="white"
-          opacity={allSelected ? 1 : 0.6}
-          cursor={allSelected ? "pointer" : "not-allowed"}
-          isDisabled={!allSelected}
-          onClick={allSelected ? handleNext : undefined}
+          onClick={handleNext}
         >
           Next
         </Button>
