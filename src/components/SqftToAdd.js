@@ -9,6 +9,7 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
   const bedroomCount = answers?.bedrooms_to_reno ?? 0;
   const bathroomCount = answers?.bathrooms_to_reno ?? 0;
   const isFullReno = renovationTypes.includes("Full renovation");
+  const [showError, setShowError] = useState(false);
 
   // Build grouped input lists
   const initialValues = {
@@ -58,12 +59,17 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
 
 
   const handleNext = () => {
+    if (!allFilled) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
     onNext({
       sqft_to_add: {
         bedrooms: values.bedrooms.map(Number),
         bathrooms: values.bathrooms.map(Number),
         other: Object.fromEntries(
-          Object.entries(values.other).map(([k,v]) => [k, Number(v)])
+          Object.entries(values.other).map(([k, v]) => [k, Number(v)])
         )
       }
     });
@@ -195,6 +201,20 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
     ))}
   </VStack>
 
+  {showError && (
+        <Box display="flex" justifyContent="center">
+          <Text
+            mt={2}
+            fontSize="sm"
+            color="red.500"
+            width="fit-content"
+            textAlign="center"
+          >
+            Please fill in all fields before continuing
+          </Text>
+        </Box>
+      )}
+
   {/* Buttons stay outside scroll */}
   <Box mt={10}>
   <Button
@@ -208,15 +228,12 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
   </Button>
 
   <Button
-    rounded="full"
-    px={8}
-    bg={allFilled ? "black" : "gray.600"}
-    color="white"
-    opacity={allFilled ? 1 : 0.6}
-    cursor={allFilled ? "pointer" : "not-allowed"}
-    isDisabled={!allFilled}
-    onClick={allFilled ? handleNext : undefined}   // ⬅ stops click when invalid
-  >
+     rounded="full"
+          px={8}
+          bg="black"
+          color="white"
+          onClick={handleNext}
+        >
     Next
   </Button>
 </Box>
