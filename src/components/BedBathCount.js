@@ -77,7 +77,17 @@ export default function BedBathCount({ onNext, onBack, selected }) {
               type="number"
               min={1}
               value={bedrooms}
-              onChange={(e) => setBedrooms(Number(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value
+
+                if (raw === '') return
+
+                const value = Number(raw)
+
+                if (!isNaN(value)) {
+                setBedrooms(value)
+                }
+              }}
               width="150px"
               textAlign="center"
               rounded="full"
@@ -96,7 +106,17 @@ export default function BedBathCount({ onNext, onBack, selected }) {
               type="number"
               min={1}
               value={bathrooms}
-              onChange={(e) => setBathrooms(Number(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value
+
+                if (raw === '') return
+
+                const value = Number(raw)
+
+                if (!isNaN(value)) {
+                setBathrooms(value)
+                }
+              }}
               width="150px"
               textAlign="center"
               rounded="full"
