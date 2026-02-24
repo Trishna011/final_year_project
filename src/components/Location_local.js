@@ -1,4 +1,4 @@
-import { Box, Button, Heading } from "@chakra-ui/react";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
@@ -6,6 +6,7 @@ const MotionBox = motion(Box);
 
 export default function Location({ onBack, onNext, answers }) {
   const [selectedOption, setSelectedOption] = useState("");
+  const [showError, setShowError] = useState(false);
 
   const options = [
     "Manchester City Centre", "Salford", "Stockport", "Bolton", "Bury", "Oldham",
@@ -15,7 +16,11 @@ export default function Location({ onBack, onNext, answers }) {
   ];
 
   const handleNext = async () => {
-    if (!selectedOption) return;
+    if (!selectedOption) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
 
     // ✅ Step 1: Update answers and show loading screen
     const updatedAnswers = { ...answers, Location: selectedOption };
@@ -94,7 +99,14 @@ export default function Location({ onBack, onNext, answers }) {
         width="100%"
         mb={8}
         value={selectedOption}
-        onChange={(e) => setSelectedOption(e.target.value)}
+        onChange={(e) => {
+          const value = e.target.value
+          setSelectedOption(value)
+
+          if (value) {
+          setShowError(false)
+          }
+        }}
         sx={{
           appearance: "none",
           outline: "none",
@@ -122,6 +134,20 @@ export default function Location({ onBack, onNext, answers }) {
           ))}
       </Box>
 
+      {showError && (
+                    <Box display="flex" justifyContent="center">
+                      <Text
+                        mt={2}
+                        fontSize="sm"
+                        color="red.500"
+                        width="fit-content"
+                        textAlign="center"
+                      >
+                        Please answer all rooms before continuing
+                      </Text>
+                    </Box>
+                  )}
+
 
       <Box mt={6}>
         <Button
@@ -134,13 +160,10 @@ export default function Location({ onBack, onNext, answers }) {
           Back
         </Button>
         <Button
-          bg={!selectedOption? "gray.600" : "black"}
-          color="white"
           rounded="full"
           px={8}
-          opacity={!selectedOption? 0.6 : 1}
-          cursor={!selectedOption? "not-allowed" : "pointer"}
-          isDisabled={!selectedOption}
+          bg="black"
+          color="white"
           onClick={handleNext}
         >
           Next
