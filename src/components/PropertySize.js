@@ -35,8 +35,8 @@ export default function PropertySize({ onBack, onNext }) {
   // ✅ Choose the right error message
   let errorMessage = "";
   if (showError) {
-    if (isEmpty) errorMessage = "Please enter a value.";
-    else if (isZeroOrNegative) errorMessage = "Please enter a number greater than 0.";
+    if (isEmpty) errorMessage = "Please enter a value";
+    else if (isZeroOrNegative) errorMessage = "Please enter a number greater than 0";
   }
 
   return (
@@ -116,11 +116,8 @@ export default function PropertySize({ onBack, onNext }) {
         <Button 
           rounded="full"
           px={8}
-          bg={canProceed ? "black" : "gray.600"}
+          bg={"black"}
           color="white"
-          opacity={canProceed ? 1 : 0.6}
-          cursor={canProceed ? "pointer" : "not-allowed"}
-          isDisabled={!canProceed} 
           onClick={handleNext}>
           Next
         </Button>
