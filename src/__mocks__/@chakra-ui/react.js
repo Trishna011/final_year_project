@@ -1,6 +1,7 @@
 const React = require('react')
 
-const Box = ({ children }) => React.createElement('div', null, children)
+const Box = ({ children, as: Tag = 'div', onChange, value, ...rest }) =>
+  React.createElement(Tag, { onChange, value, ...rest }, children)
 
 const Button = ({ children, onClick, ...rest }) =>
   React.createElement(

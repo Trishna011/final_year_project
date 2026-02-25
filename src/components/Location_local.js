@@ -143,7 +143,7 @@ export default function Location({ onBack, onNext, answers }) {
                         width="fit-content"
                         textAlign="center"
                       >
-                        Please answer all rooms before continuing
+                        Please select a location
                       </Text>
                     </Box>
                   )}
