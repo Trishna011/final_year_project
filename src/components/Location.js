@@ -1,4 +1,4 @@
-import { Box, Button, Heading } from "@chakra-ui/react";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
@@ -6,6 +6,7 @@ const MotionBox = motion(Box);
 
 export default function Location({ onBack, onNext, answers }) {
   const [selectedOption, setSelectedOption] = useState("");
+  const [showError, setShowError] = useState(false);
 
   const options = [
     "Manchester City Centre", "Salford", "Stockport", "Bolton", "Bury", "Oldham",
@@ -15,6 +16,13 @@ export default function Location({ onBack, onNext, answers }) {
   ];
 
   const handleNext = async () => {
+
+    if (!selectedOption) {
+      setShowError(true);
+      return;
+    }
+    setShowError(false);
+
     if (!selectedOption) return;
 
     // ✅ Step 1: Update answers and show loading screen
@@ -93,6 +101,20 @@ export default function Location({ onBack, onNext, answers }) {
           ))}
       </Box>
 
+      {showError && (
+              <Box display="flex" justifyContent="center">
+                <Text
+                  mt={2}
+                  fontSize="sm"
+                  color="red.500"
+                  width="fit-content"
+                  textAlign="center"
+                >
+                  Please answer all rooms before continuing
+                </Text>
+              </Box>
+            )}
+
       <Box mt={6}>
         <Button
           colorScheme="gray"
@@ -104,10 +126,11 @@ export default function Location({ onBack, onNext, answers }) {
           Back
         </Button>
         <Button
-          colorScheme="teal"
           rounded="full"
+          px={8}
+          bg="black"
+          color="white"
           onClick={handleNext}
-          isDisabled={!selectedOption}
         >
           Next
         </Button>

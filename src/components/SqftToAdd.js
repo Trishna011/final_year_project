@@ -126,7 +126,12 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
           rounded="full"
           textAlign="center"
           value={v}
-          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bedrooms", i, e.target.value)}
+          onChange={(e) => {
+            if (/^\d*$/.test(e.target.value)) {
+              handleUpdate("bedrooms", i, e.target.value)
+              if (showError) setShowError(false)
+            }
+          }}
           _hover={{ borderColor: "teal.500" }}
           _focus={{
             borderColor: "teal.500",
@@ -151,7 +156,12 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
         <Text fontWeight="medium" fontSize="md" color="black" >Bathroom {i+1}</Text>
         <Input placeholder="Enter sqft to add (0 if none)" rounded="full" textAlign="center"
           value={v}
-          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("bathrooms", i, e.target.value)}
+          onChange={(e) => {
+            if (/^\d*$/.test(e.target.value)) {
+              handleUpdate("bathrooms", i, e.target.value)
+              if (showError) setShowError(false)
+            }
+          }}
           _hover={{ borderColor: "teal.500" }}
           _focus={{
             borderColor: "teal.500",
@@ -181,7 +191,12 @@ export default function SqftToAdd({ onBack, onNext, answers }) {
         <Text fontWeight="medium" fontSize="md" color="black">{room}</Text>
         <Input placeholder="Enter sqft to add (0 if none)" rounded="full" textAlign="center"
           value={values.other[room]}
-          onChange={(e) => /^\d*$/.test(e.target.value) && handleUpdate("other", room, e.target.value)}
+          onChange={(e) => {
+            if (/^\d*$/.test(e.target.value)) {
+              handleUpdate("other", room, e.target.value)
+              if (showError) setShowError(false)
+            }
+          }}
           _hover={{ borderColor: "teal.500" }}
           _focus={{
             borderColor: "teal.500",
