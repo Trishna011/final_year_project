@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from "react"
-import Location from "../components/Location_local"
+import Location from "../components/LocationLocal"
 
 const mockOnNext = jest.fn()
 const mockOnBack = jest.fn()
