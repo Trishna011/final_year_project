@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import ParameterGrid
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import json
 from tqdm import tqdm
 
@@ -482,82 +482,91 @@ final_model.eval()
 # Predict on synthetic test set
 # =========================================================
 
-# with torch.no_grad():
-#     test_preds_scaled = final_model(X_test_num_t).cpu().numpy()
+with torch.no_grad():
+    test_preds_scaled = final_model(X_test_num_t).cpu().numpy()
 
-# # Inverse scale target
-# test_preds = target_scaler.inverse_transform(
-#     test_preds_scaled.reshape(-1, 1)
-# ).flatten()
+# Inverse scale target
+test_preds = target_scaler.inverse_transform(
+    test_preds_scaled.reshape(-1, 1)
+).flatten()
 
-# # Aggregate per property
-# pred_df = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test_raw,
-#     "y_pred": test_preds,
-# })
+# Aggregate per property
+pred_df = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test_raw,
+    "y_pred": test_preds,
+})
 
-# prop_level = pred_df.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean"),
-# )
+prop_level = pred_df.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean"),
+)
 
-# # Compute R2
-# test_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+# Compute R2
+test_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
 
-# # Compute MAPE using your function
-# test_mape = mape(
-#     prop_level["y_true"].values,
-#     prop_level["y_pred"].values
-# )
+# Compute MAPE using your function
+test_mape = mape(
+    prop_level["y_true"].values,
+    prop_level["y_pred"].values
+)
 
-# print("Test R2:", test_r2)
-# print("Test MAPE:", test_mape)
+rmse = np.sqrt(mean_squared_error(prop_level["y_true"], prop_level["y_pred"]))
+mae = mean_absolute_error(prop_level["y_true"], prop_level["y_pred"])
+
+print("Test R2:", test_r2)
+print("Test MAPE:", test_mape)
+print("Test RMSE:", rmse)
+print("Test MAE:", mae)
 
 # =========================================================
 # Predict on real test set
 # =========================================================
-real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-real_df = preprocess_real(real_df)
+# real_df = preprocess_real(real_df)
 
-y_real = real_df["price"].values.astype(np.float32)
+# y_real = real_df["price"].values.astype(np.float32)
 
-X_real = real_df[numeric_cols].copy()
+# X_real = real_df[numeric_cols].copy()
 
-# scale using TRAIN scaler
-X_real[numeric_cols] = feature_scaler.transform(X_real[numeric_cols])
+# # scale using TRAIN scaler
+# X_real[numeric_cols] = feature_scaler.transform(X_real[numeric_cols])
 
-X_real_t = torch.tensor(
-    X_real[numeric_cols].values.astype(np.float32),
-    device=device
-)
+# X_real_t = torch.tensor(
+#     X_real[numeric_cols].values.astype(np.float32),
+#     device=device
+# )
 
-with torch.no_grad():
-    real_preds_scaled = final_model(X_real_t).cpu().numpy()
+# with torch.no_grad():
+#     real_preds_scaled = final_model(X_real_t).cpu().numpy()
 
-real_preds = target_scaler.inverse_transform(
-    real_preds_scaled.reshape(-1, 1)
-).flatten()
+# real_preds = target_scaler.inverse_transform(
+#     real_preds_scaled.reshape(-1, 1)
+# ).flatten()
 
-real_r2 = r2_score(y_real, real_preds)
-real_mape = mape(y_real, real_preds)
+# real_r2 = r2_score(y_real, real_preds)
+# real_mape = mape(y_real, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_real, real_preds))
+# mae = mean_absolute_error(y_real, real_preds)
 
-print("Real Test R2:", real_r2)
-print("Real Test MAPE:", real_mape)
+# print("Real Test R2:", real_r2)
+# print("Real Test MAPE:", real_mape)
+# print("Real Test RMSE:", rmse)
+# print("Real Test MAE:", mae)
 
 
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-ft_preds_path = "modelB/ftTransformer/fttransformer_train_real_preds.csv"
+# ft_preds_path = "modelB/ftTransformer/fttransformer_train_real_preds.csv"
 
-rf_preds_df = pd.DataFrame({
-    "source_row": real_df.index,
-    "y_true": y_real,
-    "y_pred": real_preds
-})
+# rf_preds_df = pd.DataFrame({
+#     "source_row": real_df.index,
+#     "y_true": y_real,
+#     "y_pred": real_preds
+# })
 
 
-rf_preds_df.to_csv(ft_preds_path, index=False)
+# rf_preds_df.to_csv(ft_preds_path, index=False)
 

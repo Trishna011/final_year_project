@@ -2,7 +2,7 @@ import json
 import pandas as pd
 import numpy as np
 import ast
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import random
 from sklearn.model_selection import KFold
 import torch
@@ -587,8 +587,8 @@ target_scaler.scale_ = np.array(checkpoint["target_scaler_scale"], dtype=float)
 
 #load and preprocess data
 
-#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 
 
 real_test = preprocess_real(real_test, require_target=True)
@@ -620,9 +620,13 @@ preds = target_scaler.inverse_transform(
 
 r2 = r2_score(y_test, preds)
 test_mape = mape(y_test, preds)
+rmse = np.sqrt(mean_squared_error(y_test, preds))
+mae = mean_absolute_error(y_test, preds)
 
 print("Loaded FTTransformer R2:", r2)
 print("Loaded FTTransformer MAPE:", test_mape)
+print("Loaded FTTransformer RMSE:", rmse)
+print("Loaded FTTransformer MAE:", mae)
 
 #save preds
 preds_df = pd.DataFrame({
@@ -630,5 +634,5 @@ preds_df = pd.DataFrame({
     "y_pred": preds
 })
 
-preds_path = "modelB/ftTransformer/fttransformer_finetuned_synthetic_predictions.csv"
-preds_df.to_csv(preds_path, index=False)
+# preds_path = "modelB/ftTransformer/fttransformer_finetuned_synthetic_predictions.csv"
+# preds_df.to_csv(preds_path, index=False)
