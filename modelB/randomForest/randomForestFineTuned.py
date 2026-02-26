@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import ast
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import KFold
 from sklearn.ensemble import RandomForestRegressor
 import json
@@ -421,8 +421,8 @@ with open("modelB/models/randomForest/finetuned_best_params_randomForest_AAEO.js
 loaded_model = joblib.load("modelB/models/randomForest/synthetic_plus_real_rf.pkl")
 
 
-#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 real_test = preprocess_real(real_test, require_target=True)
 
 X_test_raw = real_test[raw_feature_list]
@@ -438,9 +438,13 @@ test_preds = loaded_model.predict(X_test)
 
 r2 = r2_score(y_test, test_preds)
 test_mape = mape(y_test, test_preds)
+rmse = np.sqrt(mean_squared_error(y_test, test_preds))
+mae = mean_absolute_error(y_test, test_preds)
 
 print("Loaded model R2 on real test:", r2)
 print("Loaded model MAPE on real test:", test_mape)
+print("Loaded model RMSE on real test:", rmse)
+print("Loaded model MAE on real test:", mae)
 
 # Save predictions
 preds_df = pd.DataFrame({
@@ -448,5 +452,5 @@ preds_df = pd.DataFrame({
     "y_pred": test_preds
 })
 
-preds_path = "modelB/randomForest/randomForest_finetuned_synthetic_predictions.csv"
+preds_path = "modelB/randomForest/randomForest_finetuned_real_predictions.csv"
 preds_df.to_csv(preds_path, index=False)

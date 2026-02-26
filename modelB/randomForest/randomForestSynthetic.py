@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import joblib
 import json
 
@@ -187,67 +187,75 @@ with open(params_path, "w") as f:
 # Evaluate on synthetic test set
 # -----------------------------------
 
-# test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-# test_exp = test_exp.dropna(subset=[target])
+test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+test_exp = test_exp.dropna(subset=[target])
 
-# X_test = test_exp[features]
-# y_test = test_exp[target]
+X_test = test_exp[features]
+y_test = test_exp[target]
 
-# # Predict
-# test_preds = rf_model.predict(X_test)
+# Predict
+test_preds = rf_model.predict(X_test)
 
-# # Aggregate to property level
-# pred_df = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test.values,
-#     "y_pred": test_preds
-# })
+# Aggregate to property level
+pred_df = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test.values,
+    "y_pred": test_preds
+})
 
-# prop_level = pred_df.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean")
-# )
+prop_level = pred_df.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean")
+)
 
-# # Metrics
-# test_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-# test_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+# Metrics
+test_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+test_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+rmse = np.sqrt(mean_squared_error(prop_level["y_true"], prop_level["y_pred"]))
+mae = mean_absolute_error(prop_level["y_true"], prop_level["y_pred"])
 
-# print("Random Forest R2 (synthetic test):", test_r2)
-# print("Random Forest MAPE (synthetic test):", test_mape)
+print("Random Forest R2 (synthetic test):", test_r2)
+print("Random Forest MAPE (synthetic test):", test_mape)
+print("Random Forest RMSE (synthetic test):", rmse)
+print("Random Forest MAE (synthetic test):", mae)
 
 # -----------------------------------
 # Evaluate on real test set
 # -----------------------------------
-model_path = "modelB/models/randomForest/randomforest_synthetic_model.pkl"
-rf_model = joblib.load(model_path)
+# model_path = "modelB/models/randomForest/randomforest_synthetic_model.pkl"
+# rf_model = joblib.load(model_path)
 
-real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-real_df = preprocess_real(real_df)
+# real_df = preprocess_real(real_df)
 
-y_true = real_df["price"]
+# y_true = real_df["price"]
 
-X_real = real_df[features]
+# X_real = real_df[features]
 
-real_preds = rf_model.predict(X_real)
+# real_preds = rf_model.predict(X_real)
 
-real_r2 = r2_score(y_true, real_preds)
-real_mape = mape(y_true, real_preds)
+# real_r2 = r2_score(y_true, real_preds)
+# real_mape = mape(y_true, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_true, real_preds))
+# mae = mean_absolute_error(y_true, real_preds)
 
-print("Random Forest R2 (real test):", real_r2)
-print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest R2 (real test):", real_r2)
+# print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest RMSE (real test):", rmse)
+# print("Random Forest MAE (real test):", mae)
 
 #----------------------------------
 # save predictions for Wilcoxon test
 #----------------------------------
-rf_preds_path = "modelB/randomForest/randomforest_train_real_preds.csv"
+# rf_preds_path = "modelB/randomForest/randomforest_train_real_preds.csv"
 
-pred_df = pd.DataFrame({
-    "source_row": real_df.index,
-    "y_true": y_true.values,
-    "y_pred": real_preds
-})
+# pred_df = pd.DataFrame({
+#     "source_row": real_df.index,
+#     "y_true": y_true.values,
+#     "y_pred": real_preds
+# })
 
-pred_df.to_csv(rf_preds_path, index=False)
+# pred_df.to_csv(rf_preds_path, index=False)
 
-print(f"Saved Random Forest synthetic predictions to {rf_preds_path}")
+# print(f"Saved Random Forest synthetic predictions to {rf_preds_path}")
