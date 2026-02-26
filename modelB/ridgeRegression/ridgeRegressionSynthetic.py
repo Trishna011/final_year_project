@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import joblib
 import json
 from sklearn.preprocessing import StandardScaler
@@ -202,67 +202,75 @@ target = "post_renovation_value"
 # Predictions SYNTEHTIC TEST
 # --------------------
 
-# test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
 
-# # Drop missing targets
-# test_exp = test_exp.dropna(subset=[target])
+# Drop missing targets
+test_exp = test_exp.dropna(subset=[target])
 
-# # Ensure correct feature order
-# X_test = test_exp[features].copy()
-# y_test = test_exp[target]
+# Ensure correct feature order
+X_test = test_exp[features].copy()
+y_test = test_exp[target]
 
-# test_preds = ridge_pipeline.predict(X_test)
+test_preds = ridge_pipeline.predict(X_test)
 
-# # build prediction dataframe
-# pred_df = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test.values,
-#     "y_pred": test_preds
-# })
+# build prediction dataframe
+pred_df = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test.values,
+    "y_pred": test_preds
+})
 
-# # aggregate to property level
-# prop_level = pred_df.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean")
-# )
+# aggregate to property level
+prop_level = pred_df.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean")
+)
 
-# # metrics
-# r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-# val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+# metrics
+r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+val_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+rmse = np.sqrt(mean_squared_error(prop_level["y_true"], prop_level["y_pred"]))
+mae = mean_absolute_error(prop_level["y_true"], prop_level["y_pred"])
 
-# print("Ridge Regression R2 (synthetic):", r2)
-# print("Ridge Regression MAPE (synthetic):", val_mape)
+print("Ridge Regression R2 (synthetic):", r2)
+print("Ridge Regression MAPE (synthetic):", val_mape)
+print("Ridge Regression RMSE (synthetic):", rmse)
+print("Ridge Regression MAE (synthetic):", mae)
 
 
 # -----------------------
 # Preds real data
 # -----------------------
-real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-real_df = preprocess_real(real_df)
+# real_df = preprocess_real(real_df)
 
-y_true = real_df["price"]
+# y_true = real_df["price"]
 
-X_real = real_df[features]
+# X_real = real_df[features]
 
-real_preds = ridge_pipeline.predict(X_real)
+# real_preds = ridge_pipeline.predict(X_real)
 
-real_r2 = r2_score(y_true, real_preds)
-real_mape = mape(y_true, real_preds)
+# real_r2 = r2_score(y_true, real_preds)
+# real_mape = mape(y_true, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_true, real_preds))
+# mae = mean_absolute_error(y_true, real_preds)
 
-print("Random Forest R2 (real test):", real_r2)
-print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest R2 (real test):", real_r2)
+# print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest RMSE (real test):", rmse)
+# print("Random Forest MAE (real test):", mae)
 
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-ridge_preds_path = "modelB/ridgeRegression/ridge_train_real_preds.csv"
+# ridge_preds_path = "modelB/ridgeRegression/ridge_train_real_preds.csv"
 
-pred_df = pd.DataFrame({
-    "source_row": real_df.index,
-    "y_true": y_true.values,
-    "y_pred": real_preds
-})
+# pred_df = pd.DataFrame({
+#     "source_row": real_df.index,
+#     "y_true": y_true.values,
+#     "y_pred": real_preds
+# })
 
 # pred_df = pd.DataFrame({
 #     "source_row": prop_level["y_true"].index,
@@ -270,5 +278,5 @@ pred_df = pd.DataFrame({
 #     "y_pred": prop_level["y_pred"].values
 # })
 
-pred_df.to_csv(ridge_preds_path, index=False)
+# pred_df.to_csv(ridge_preds_path, index=False)
 
