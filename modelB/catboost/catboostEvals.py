@@ -270,9 +270,10 @@ shap.summary_plot(shap_values, X_test,
                   color="#2878B5")     # consistent blue
 
 ax = plt.gca()
-ax.set_title("Mean Absolute SHAP Values — Feature Importance for\nPost Renovation Property Valuation Model", 
+ax.set_title("Top Features Affecting Post Renovation Property \nValuation Model (Mean |SHAP|)", 
              fontsize=14, pad=15)
-ax.set_xlabel("mean(|SHAP value|) (average impact on model output magnitude)", fontsize=12)
+ax.set_xlabel("Mean absolute SHAP value (£)", fontsize=12)
+ax.set_ylabel("Feature", fontsize=12)
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
 ax.grid(axis="x", alpha=0.3)
@@ -288,7 +289,7 @@ shap.summary_plot(shap_values, X_test,
 ax = plt.gca()
 ax.set_title("SHAP Value Distribution by Feature — Post-Renovation Valuation Model", 
              fontsize=14, pad=15)
-ax.set_xlabel("SHAP value (impact on model output)", fontsize=12)
+ax.set_xlabel("SHAP value (impact on model output) (£)", fontsize=12)
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
 ax.grid(axis="x", alpha=0.3)
