@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import ast
 import json
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from lightgbm import early_stopping, log_evaluation, LGBMRegressor, Booster
 import joblib
 import random
@@ -328,8 +328,8 @@ loaded_booster = Booster(
     model_file="modelB/models/lightGBM/synthetic_plus_real_lightgbm_model.txt"
 )
 
-real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 real_test = preprocess_real(real_test, require_target=True)
 
 X_test_raw = real_test[raw_feature_list]
@@ -342,19 +342,21 @@ y_test = real_test["post_renovation_value"]
 test_preds = loaded_booster.predict(X_test)
 
 r2 = r2_score(y_test, test_preds)
-
-
 test_mape = mape(y_test, test_preds)
+rmse = np.sqrt(mean_squared_error(y_test, test_preds))
+mae = mean_absolute_error(y_test, test_preds)
 
 print("Loaded LightGBM R2 on test:", r2)
 print("Loaded LightGBM MAPE on test:", test_mape)
+print("Loaded LightGBM RMSE on test:", rmse)
+print("Loaded LightGBM MAE on test:", mae)
 
 preds_df = pd.DataFrame({
     "y_true": y_test.values,
     "y_pred": test_preds
 })
 
-preds_df.to_csv(
-    "modelB/lightGBM/lightgbm_finetuned_synthetic_predictions.csv",
-    index=False
-)
+# preds_df.to_csv(
+#     "modelB/lightGBM/lightgbm_finetuned_synthetic_predictions.csv",
+#     index=False
+# )

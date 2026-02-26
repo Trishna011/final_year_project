@@ -1,5 +1,5 @@
 import json
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 import pandas as pd
@@ -260,65 +260,73 @@ y_test = test_exp[target]
 # # -------------------------------------------------------
 # # Final preds on test set
 # # -------------------------------------------------------
+best_model = joblib.load("modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
+test_preds = best_model.predict(X_test)
 
-# test_preds = best_model.predict(X_test)
+pred_df = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test.values,
+    "y_pred": test_preds,
+})
 
-# pred_df = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test.values,
-#     "y_pred": test_preds,
-# })
+# Average predictions per property
+prop_level = pred_df.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean"),
+)
 
-# # Average predictions per property
-# prop_level = pred_df.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean"),
-# )
+# Evaluate performance
+r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+test_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+rmse = np.sqrt(mean_squared_error(prop_level["y_true"], prop_level["y_pred"]))
+mae = mean_absolute_error(prop_level["y_true"], prop_level["y_pred"])
 
-# # Evaluate performance
-# r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-# test_mape = mape(prop_level["y_true"], prop_level["y_pred"])
-
-# print("Test R2:", r2)
-# print("Test MAPE:", test_mape)
+print("Test R2:", r2)
+print("Test MAPE:", test_mape)
+print("Test RMSE:", rmse)
+print("Test MAE:", mae)
 
 # -------------------------------------------------------
 # Final preds on real data test set
 # -------------------------------------------------------
 
-model = joblib.load("modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
-print("Model expects features:", model.booster_.num_feature())
+# model = joblib.load("modelB/models/lightGBM/lightgbm_synthetic_model.pkl")
+# print("Model expects features:", model.booster_.num_feature())
 
-real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-# Preprocess features
-real_df_processed = preprocess_real(real_test)
+# # Preprocess features
+# real_df_processed = preprocess_real(real_test)
 
-# Ground truth (post renovation value)
-y_true = real_df_processed["price"].astype(float)
+# # Ground truth (post renovation value)
+# y_true = real_df_processed["price"].astype(float)
 
-# Ensure feature alignment
-real_X = real_df_processed[features]
+# # Ensure feature alignment
+# real_X = real_df_processed[features]
 
-real_preds = model.predict(real_X)
+# real_preds = model.predict(real_X)
 
-r2 = r2_score(y_true, real_preds)
-real_mape = mape(y_true, real_preds)
+# r2 = r2_score(y_true, real_preds)
+# real_mape = mape(y_true, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_true, real_preds))
+# mae = mean_absolute_error(y_true, real_preds)
 
-print("Real Data R2:", r2)
-print("Real Data MAPE:", real_mape)
+# print("Real Data R2:", r2)
+# print("Real Data MAPE:", real_mape)
+# print("Real Data RMSE:", rmse)
+# print("Real Data MAE:", mae)
 
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-catboost_preds_path = "modelB/lightGBM/lightgbm_train_real_preds.csv"
+# catboost_preds_path = "modelB/lightGBM/lightgbm_train_real_preds.csv"
 
-pred_df = pd.DataFrame({
-    "source_row": real_df_processed.index,
-    "y_true": y_true.values,
-    "y_pred": real_preds
-})
+# pred_df = pd.DataFrame({
+#     "source_row": real_df_processed.index,
+#     "y_true": y_true.values,
+#     "y_pred": real_preds
+# })
 
-pred_df.to_csv(catboost_preds_path, index=False)
+# pred_df.to_csv(catboost_preds_path, index=False)
 
-print(f"Saved CatBoost synthetic predictions to {catboost_preds_path}")
+# print(f"Saved CatBoost synthetic predictions to {catboost_preds_path}")
