@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import joblib
 import json
 from sklearn.model_selection import ParameterGrid, KFold, GridSearchCV
@@ -266,75 +266,83 @@ feature_columns = params_data["feature_columns"]
 # -------------------------
 # test on synth data
 # -------------------------
-# target = "post_renovation_value"
+target = "post_renovation_value"
 
-# # Drop missing targets
-# test_exp = test_exp.dropna(subset=[target])
+# Drop missing targets
+test_exp = test_exp.dropna(subset=[target])
 
-# # # Predict (row level)
-# X_test = test_exp[feature_columns]
-# y_test = test_exp[target].values
+# # Predict (row level)
+X_test = test_exp[feature_columns]
+y_test = test_exp[target].values
 
-# y_pred = model.predict(X_test)
+y_pred = model.predict(X_test)
 
-# # # Aggregate to property level
-# test_df = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test,
-#     "y_pred": y_pred
-# })
+# # Aggregate to property level
+test_df = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test,
+    "y_pred": y_pred
+})
 
-# prop_level = test_df.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean")
-# )
+prop_level = test_df.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean")
+)
 
-# # Metrics (property level)
-# prop_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
-# prop_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+# Metrics (property level)
+prop_r2 = r2_score(prop_level["y_true"], prop_level["y_pred"])
+prop_mape = mape(prop_level["y_true"], prop_level["y_pred"])
+rmse = np.sqrt(mean_squared_error(prop_level["y_true"], prop_level["y_pred"]))
+mae = mean_absolute_error(prop_level["y_true"], prop_level["y_pred"])
 
-# print("Property-level TEST R2:", prop_r2)
-# print("Property-level TEST MAPE:", prop_mape)
+print("Property-level TEST R2:", prop_r2)
+print("Property-level TEST MAPE:", prop_mape)
+print("Property-level TEST RMSE:", rmse)
+print("Property-level TEST MAE:", mae)
 
 # -----------------------
 # Preds real data
 # -----------------------
-real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-# Preprocess features
-real_df = preprocess_real(real_df)
+# # Preprocess features
+# real_df = preprocess_real(real_df)
 
-# Ground truth (post renovation value)
-y_true = real_df["price"]
+# # Ground truth (post renovation value)
+# y_true = real_df["price"]
 
-# Ensure feature alignment
-X_real = real_df[features]
+# # Ensure feature alignment
+# X_real = real_df[features]
 
-real_preds = model.predict(X_real)
+# real_preds = model.predict(X_real)
 
-real_r2 = r2_score(y_true, real_preds)
-real_mape = mape(y_true, real_preds)
+# real_r2 = r2_score(y_true, real_preds)
+# real_mape = mape(y_true, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_true, real_preds))
+# mae = mean_absolute_error(y_true, real_preds)
 
-print("Random Forest R2 (real test):", real_r2)
-print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest R2 (real test):", real_r2)
+# print("Random Forest MAPE (real test):", real_mape)
+# print("Random Forest RMSE (real test):", rmse)
+# print("Random Forest MAE (real test):", mae)
 
 
 # -------------------------
 # SAVE PREDICTIONS FOR WILCOXON
 # -------------------------
-svr_preds_path = "modelB/SVR/svr_train_real_preds.csv"
-
-pred_df = pd.DataFrame({
-    "source_row": real_df.index,
-    "y_true": y_true.values,
-    "y_pred": real_preds
-})
+# svr_preds_path = "modelB/SVR/svr_train_real_preds.csv"
 
 # pred_df = pd.DataFrame({
-#     "source_row": prop_level["y_true"].index,
-#     "y_true": prop_level["y_true"].values,
-#     "y_pred": prop_level["y_pred"].values
+#     "source_row": real_df.index,
+#     "y_true": y_true.values,
+#     "y_pred": real_preds
 # })
 
-pred_df.to_csv(svr_preds_path, index=False)
+# # pred_df = pd.DataFrame({
+# #     "source_row": prop_level["y_true"].index,
+# #     "y_true": prop_level["y_true"].values,
+# #     "y_pred": prop_level["y_pred"].values
+# # })
+
+# pred_df.to_csv(svr_preds_path, index=False)
 

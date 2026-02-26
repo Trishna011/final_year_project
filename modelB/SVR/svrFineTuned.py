@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import ast
 from sklearn.svm import SVR
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import json
 from sklearn.model_selection import KFold
 import random
@@ -391,8 +391,8 @@ print("Loaded model:", svr_model)
 # pred on real data and synth data
 # =========================
 
-real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-#real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+#real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
 # Preprocess test data to match training schema
 real_test = preprocess_real(real_test, require_target=True)
@@ -415,15 +415,19 @@ test_preds = svr_model.predict(X_test_scaled)
 
 r2 = r2_score(y_test, test_preds)
 test_mape = mape(y_test, test_preds)
+rmse = np.sqrt(mean_squared_error(y_test, test_preds))
+mae = mean_absolute_error(y_test, test_preds)
 
 print("Loaded model R2 on real test:", r2)
 print("Loaded model MAPE on real test:", test_mape)
+print("Loaded model RMSE on real test:", rmse)
+print("Loaded model MAE on real test:", mae)
 
 # Save predictions
-preds_df = pd.DataFrame({
-    "y_true": y_test.values,
-    "y_pred": test_preds
-})
+# preds_df = pd.DataFrame({
+#     "y_true": y_test.values,
+#     "y_pred": test_preds
+# })
 
-preds_path = "modelB/SVR/svr_finetuned_synthetic_predictions.csv"
-preds_df.to_csv(preds_path, index=False)
+# preds_path = "modelB/SVR/svr_finetuned_synthetic_predictions.csv"
+# preds_df.to_csv(preds_path, index=False)
