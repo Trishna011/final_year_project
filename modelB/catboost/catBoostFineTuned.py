@@ -412,7 +412,7 @@ def run_test_predictions():
 
     return y_test, test_preds, real_test, loaded_model, X_test
 
-run_test_predictions()
+#run_test_predictions()
 
 # -------------------------------------------
 # Function to preprocess single input and predict cost
