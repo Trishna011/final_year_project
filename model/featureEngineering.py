@@ -59,10 +59,18 @@ for col in numeric_cols:
     print(f"{col}: {len(outliers)} outliers")
 
 #plot box plots for the numeric columns that have outliers and show the outliers
-plt.figure(figsize=(12, 6))
-sns.boxplot(data=df[cols_with_outliers])
-plt.title('Boxplots of Numeric Columns with Outliers')
-plt.xticks(rotation=45)
+fig, axes = plt.subplots(1, len(cols_with_outliers), figsize=(5 * len(cols_with_outliers), 6))
+
+for i, col in enumerate(cols_with_outliers):
+    sns.boxplot(y=df[col], ax=axes[i], color="#2878B5")
+    axes[i].set_xlabel(col, fontsize=11)  # ← add x label
+    axes[i].set_ylabel("Value (£)" if i == 0 else "")
+    axes[i].spines["top"].set_visible(False)
+    axes[i].spines["right"].set_visible(False)
+    axes[i].grid(axis="y", alpha=0.3)
+
+fig.suptitle("Boxplots of Numeric Columns with Outliers", fontsize=14)
+plt.tight_layout(rect=[0, 0, 1, 0.95])  
 plt.show()
 
 #k-fold cross validation
