@@ -179,6 +179,8 @@ pipeline = Pipeline([
     # Standardize features: (x - mean) / std
     # Important for SVR since it is sensitive to feature scale
     ("scaler", StandardScaler()),
+
+    #using Gaussian kernel
     ("svr", SVR(kernel="rbf"))
 ])
 
