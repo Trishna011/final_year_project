@@ -9,7 +9,7 @@ import SqftToAdd from "./components/SqftToAdd";
 import StructChanges from "./components/StructChanges";
 import MaterialGrade from "./components/MaterialGrade";
 import CostPage from "./components/CostPage";
-import LocationLocal from "./components/LocationLocal"
+import Location from "./components/Location"
 import BedBathCount from "./components/BedBathCount"
 
 const MotionBox = motion(Box);
@@ -171,7 +171,7 @@ export default function App() {
             <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 8 ? (
             //<Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
-            <LocationLocal step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            <Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ):(
             <CostPage step={step} cost={answers.cost} postRenovationValue={answers.postRenovationValue} onRestart={startOver} clearAnswers={clearAnswers} />
           )}

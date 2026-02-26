@@ -16,23 +16,19 @@ export default function Location({ onBack, onNext, answers }) {
   ];
 
   const handleNext = async () => {
-
     if (!selectedOption) {
       setShowError(true);
       return;
     }
     setShowError(false);
 
-    if (!selectedOption) return;
-
     // ✅ Step 1: Update answers and show loading screen
     const updatedAnswers = { ...answers, Location: selectedOption };
 
     try {
       // ✅ Step 2: Send to server
-      //http://localhost:4000/api/estimate
       //http://13.60.223.46:4000/api/estimate
-      const res = await fetch("/api/estimate", {
+      const res = await fetch("https://your-express-server.onrender.com/api/estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedAnswers),
@@ -41,20 +37,36 @@ export default function Location({ onBack, onNext, answers }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Prediction failed");
 
+      const renovationCost = data.total_predicted_cost;
+
+      //send all inputs and cost to server to find projected val of property post renovation
+      const valueRes = await fetch("https://your-express-server.onrender.com/api/value", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...updatedAnswers,
+          renovation_cost: renovationCost,
+        }),
+      });
+
+      const valueData = await valueRes.json();
+      if (!valueRes.ok) throw new Error("Value prediction failed");
       // ✅ Step 3: Pass both updated answers + cost to parent
       onNext({
-        cost: data.predicted_cost
+        ...updatedAnswers,
+        cost: data.total_predicted_cost,
+        postRenovationValue: valueData.post_renovation_value,
       });
     } catch (err) {
       onNext({
         ...updatedAnswers,
         cost: 0,
+        postRenovationValue: 0,
       });
     } finally {
       
     }
   };
-
 
 
   // ✅ Step 5: Normal form UI
@@ -80,15 +92,36 @@ export default function Location({ onBack, onNext, answers }) {
         size="lg"
         rounded="full"
         bg="white"
-        borderWidth="2px"
-        borderColor="gray.300"
-        focusBorderColor="teal.500"
-        mb={8}
+        borderWidth="1px"
+        borderColor="teal.500"
         px={4}
         py={3}
         width="100%"
+        mb={8}
         value={selectedOption}
-        onChange={(e) => setSelectedOption(e.target.value)}
+        onChange={(e) => {
+          const value = e.target.value
+          setSelectedOption(value)
+
+          if (value) {
+          setShowError(false)
+          }
+        }}
+        sx={{
+          appearance: "none",
+          outline: "none",
+        }}
+        _focus={{
+          borderColor: "teal.500 !important",
+          boxShadow: "0 0 0 2px rgba(56, 178, 172, 0.6) !important", // subtle teal glow
+          outline: "none"
+        }}
+        _focusVisible={{
+          borderColor: "teal.500 !important",
+          boxShadow: "none !important",
+          outline: "none",
+        }}
+        _hover={{ borderColor: "teal.500" }}
       >
         <option value="">Select a location</option>
         {options
@@ -102,18 +135,19 @@ export default function Location({ onBack, onNext, answers }) {
       </Box>
 
       {showError && (
-              <Box display="flex" justifyContent="center">
-                <Text
-                  mt={2}
-                  fontSize="sm"
-                  color="red.500"
-                  width="fit-content"
-                  textAlign="center"
-                >
-                  Please answer all rooms before continuing
-                </Text>
-              </Box>
-            )}
+                    <Box display="flex" justifyContent="center">
+                      <Text
+                        mt={2}
+                        fontSize="sm"
+                        color="red.500"
+                        width="fit-content"
+                        textAlign="center"
+                      >
+                        Please select a location
+                      </Text>
+                    </Box>
+                  )}
+
 
       <Box mt={6}>
         <Button
