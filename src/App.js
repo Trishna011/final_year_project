@@ -171,7 +171,7 @@ export default function App() {
             <PropertySize step={step} onNext={handleNext} onBack={handleBack} />
           ) : step === 8 ? (
             //<Location step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
-            <Location_local step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
+            <LocationLocal step={step} onNext={handleNext} onBack={handleBack} answers={answers} />
           ):(
             <CostPage step={step} cost={answers.cost} postRenovationValue={answers.postRenovationValue} onRestart={startOver} clearAnswers={clearAnswers} />
           )}
