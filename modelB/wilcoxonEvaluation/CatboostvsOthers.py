@@ -43,6 +43,7 @@ ftTransformer_real = pd.read_csv("modelB/ftTransformer/fttransformer_finetuned_r
 rf_real = pd.read_csv("modelB/randomForest/randomForest_finetuned_real_predictions.csv")
 ridge_real = pd.read_csv("modelB/ridgeRegression/ridge_finetuned_real_predictions.csv")
 svr_real = pd.read_csv("modelB/SVR/svr_finetuned_real_predictions.csv")
+manual_real = pd.read_csv("modelB/manualModel/manual_train_real_preds.csv")
 
 catboost_errors_real = absolute_percentage_error(
     catboost_real["y_true"],
@@ -74,6 +75,11 @@ svr_errors_real = absolute_percentage_error(
     svr_real["y_pred"]
 )
 
+manual_errors_real = absolute_percentage_error(
+    manual_real["y_true"],
+    manual_real["y_pred"]
+)
+
 # =========================
 # WILCOXON TEST
 # =========================
@@ -97,6 +103,7 @@ wilcoxon_test(catboost_errors_real, ftTransformer_errors_real, "ftTransformer")
 wilcoxon_test(catboost_errors_real, rf_errors_real, "rf")
 wilcoxon_test(catboost_errors_real, ridge_errors_real, "Ridge")
 wilcoxon_test(catboost_errors_real, svr_errors_real, "SVR")
+wilcoxon_test(catboost_errors_real, manual_errors_real, "Manual")
 
 
 # =========================

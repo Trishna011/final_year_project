@@ -9,7 +9,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy import stats
 from sklearn.metrics import r2_score
 
-y_test, test_preds, real_test, loaded_model, X_test = run_test_predictions()
+y_test, test_preds, real_test, loaded_model, X_test, r2 = run_test_predictions()
 
 # -------------------------
 # Plot predicted vs acc cost graph
