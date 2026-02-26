@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import ast
 from catboost import CatBoostRegressor, Pool
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import random
 from sklearn.model_selection import KFold
 
@@ -377,8 +377,8 @@ loaded_model.load_model("modelB/models/catBoost/synthetic_plus_real_catboost_mod
 
 def run_test_predictions():
 
-    real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
-    #real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+    #real_test = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+    real_test = pd.read_csv("processed_data/synthetic_test_expanded.csv")
     real_test = preprocess_real(real_test, require_target=True)
 
     X_test = real_test[SYN_FEATURE_COLS]
@@ -393,9 +393,13 @@ def run_test_predictions():
 
     r2 = r2_score(y_test, test_preds)
     test_mape = mape(y_test, test_preds)
+    rmse = np.sqrt(mean_squared_error(y_test, test_preds))
+    mae = mean_absolute_error(y_test, test_preds)
 
     print("Loaded model R2 on real test:", r2)
     print("Loaded model MAPE on real test:", test_mape)
+    print("Loaded model RMSE on real test:", rmse)
+    print("Loaded model MAE on real test:", mae)
 
     # Save predictions
     preds_df = pd.DataFrame({
@@ -403,10 +407,12 @@ def run_test_predictions():
         "y_pred": test_preds
     })
 
-    preds_path = "modelB/catBoost/catboost_finetuned_real_predictions.csv"
+    preds_path = "modelB/catBoost/catboost_finetuned_synthetic_predictions.csv"
     preds_df.to_csv(preds_path, index=False)
 
     return y_test, test_preds, real_test, loaded_model, X_test
+
+run_test_predictions()
 
 # -------------------------------------------
 # Function to preprocess single input and predict cost

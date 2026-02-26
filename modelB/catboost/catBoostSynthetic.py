@@ -1,6 +1,6 @@
 import json
 from catboost import CatBoostRegressor, Pool
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 import pandas as pd
@@ -292,57 +292,66 @@ model.load_model("modelB/models/catBoost/synthetic_catboost_best_model2.cbm")
 # Evaluate on synthetic test set
 # -------------------------------------------------------
 
-# test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
-# test_exp = test_exp.dropna(subset=[target])
+test_exp = pd.read_csv("processed_data/synthetic_test_expanded.csv")
+test_exp = test_exp.dropna(subset=[target])
 
-# X_test = test_exp[features]
-# y_test = test_exp[target]
+X_test = test_exp[features]
+y_test = test_exp[target]
 
-# # Predict
-# test_preds = model.predict(X_test)
+# Predict
+test_preds = model.predict(X_test)
 
-# # Aggregate to property level
-# pred_df_test = pd.DataFrame({
-#     "source_row": test_exp["source_row"].values,
-#     "y_true": y_test.values,
-#     "y_pred": test_preds,
-# })
+# Aggregate to property level
+pred_df_test = pd.DataFrame({
+    "source_row": test_exp["source_row"].values,
+    "y_true": y_test.values,
+    "y_pred": test_preds,
+})
 
-# prop_level_test = pred_df_test.groupby("source_row", as_index=False).agg(
-#     y_true=("y_true", "first"),
-#     y_pred=("y_pred", "mean"),
-# )
+prop_level_test = pred_df_test.groupby("source_row", as_index=False).agg(
+    y_true=("y_true", "first"),
+    y_pred=("y_pred", "mean"),
+)
 
-# # Metrics
-# test_r2 = r2_score(prop_level_test["y_true"], prop_level_test["y_pred"])
-# test_mape = mape(prop_level_test["y_true"], prop_level_test["y_pred"])
+# Metrics
+test_r2 = r2_score(prop_level_test["y_true"], prop_level_test["y_pred"])
+test_mape = mape(prop_level_test["y_true"], prop_level_test["y_pred"])
+rmse = np.sqrt(mean_squared_error(prop_level_test["y_true"], prop_level_test["y_pred"]))
+mae = mean_absolute_error(prop_level_test["y_true"], prop_level_test["y_pred"])
 
-# print("Synthetic Test R2:", test_r2)
-# print("Synthetic Test MAPE:", test_mape)
+print("Synthetic Test R2:", test_r2)
+print("Synthetic Test MAPE:", test_mape)
+print("Synthetic Test RMSE:", rmse)
+print("Synthetic Test MAE:", mae)
 
 
 # -------------------------------------------------------
 # Evaluate on real data
 # -------------------------------------------------------
 
-real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
+# real_df = pd.read_csv("processed_data/real_test_with_predicted_reno_cost.csv")
 
-# Preprocess features
-real_df_processed = preprocess_real(real_df)
+# # Preprocess features
+# real_df_processed = preprocess_real(real_df)
 
-# Ground truth (post renovation value)
-y_true = real_df_processed["price"].astype(float)
+# # Ground truth (post renovation value)
+# y_true = real_df_processed["price"].astype(float)
 
-# Ensure feature alignment
-real_X = real_df_processed[features]
+# # Ensure feature alignment
+# real_X = real_df_processed[features]
 
-real_preds = model.predict(real_X)
+# real_preds = model.predict(real_X)
 
-r2 = r2_score(y_true, real_preds)
-real_mape = mape(y_true, real_preds)
+# r2 = r2_score(y_true, real_preds)
+# real_mape = mape(y_true, real_preds)
+# rmse = np.sqrt(mean_squared_error(y_true, real_preds))
+# mae = mean_absolute_error(y_true, real_preds)
 
-print("Real Data R2:", r2)
-print("Real Data MAPE:", real_mape)
+
+# print("Real Data R2:", r2)
+# print("Real Data MAPE:", real_mape)
+# print("Real Data RMSE:", rmse)
+# print("Real Data MAE:", mae)
 
 # -------------------------------------------------------
 # Save feature order
@@ -356,14 +365,13 @@ with open(feature_cols_path, "w") as f:
 # -------------------------------------------------------
 # Save predictions for Wilcoxon test 
 # -------------------------------------------------------
-catboost_preds_path = "modelB/catBoost/catboost_train_real_preds.csv"
+# catboost_preds_path = "modelB/catBoost/catboost_train_syntehtic_preds.csv"
 
-pred_df = pd.DataFrame({
-    "source_row": real_df_processed.index,
-    "y_true": y_true.values,
-    "y_pred": real_preds
-})
+# pred_df = pd.DataFrame({
+#     "source_row": real_df_processed.index,
+#     "y_true": y_true.values,
+#     "y_pred": real_preds
+# })
 
-pred_df.to_csv(catboost_preds_path, index=False)
+# pred_df.to_csv(catboost_preds_path, index=False)
 
-print(f"Saved CatBoost synthetic predictions to {catboost_preds_path}")
