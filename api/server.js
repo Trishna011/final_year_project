@@ -6,13 +6,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Ensure PORT exists (required for Docker & ECS)
-const PORT = process.env.PORT || 4000;
-
 // 👇 Forward frontend data to Flask
 app.post("/api/estimate", async (req, res) => {
   try {
-    const flaskResponse = await fetch("http://flask-api.backend.local:5001/predict", {
+    const flaskResponse = await fetch("https://final-year-project-unti.onrender.com/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
@@ -26,6 +23,23 @@ app.post("/api/estimate", async (req, res) => {
   }
 });
 
+app.post("/api/value", async (req, res) => {
+  try {
+    const flaskResponse = await fetch("https://final-year-project-unti.onrender.com/value", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+
+    const value = await flaskResponse.json();
+    res.json(value);
+  } catch (err) {
+    console.error("Error contacting Flask value API:", err);
+    res.status(500).json({ error: "Failed to contact value service" });
+  }
+});
+
+
 // Start server
 
 app.get("/health", (req, res) => {
@@ -33,6 +47,5 @@ app.get("/health", (req, res) => {
 });
 
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Express server running on port ${PORT}`);
-});
+const PORT = 4000;
+app.listen(PORT, () => console.log(`🚀 Express server running on port ${PORT}`));
